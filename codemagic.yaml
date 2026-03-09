@@ -51,8 +51,8 @@ workflows:
           if [ -n "$ULC" ]; then
             echo "--- Trying Unity Licensing Client (Unity 6 method) ---"
             "$ULC" --activate-ulf \
-              -username "$UNITY_USERNAME" \
-              -password "$UNITY_PASSWORD" \
+              --username "$UNITY_USERNAME" \
+              --password "$UNITY_PASSWORD" \
               2>&1 | tee /tmp/unity_ulc.log || true
             cat /tmp/unity_ulc.log || true
           else
