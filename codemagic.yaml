@@ -45,11 +45,11 @@ workflows:
         script: |
           UNITY_BIN=$(find /Applications -name "Unity" -type f 2>/dev/null | head -1)
           echo "Using Unity at: $UNITY_BIN"
-          echo "$UNITY_LICENSE_CONTENT" | tr -d '\r' > /tmp/Unity_lic.ulf
           "$UNITY_BIN" \
             -batchmode -quit -nographics \
             -logFile /tmp/unity_activate2.log \
-            -manualLicenseFile /tmp/Unity_lic.ulf
+            -username "$UNITY_USERNAME" \
+            -password "$UNITY_PASSWORD" || true
           cat /tmp/unity_activate2.log || true
 
       - name: Build Unity iOS project
