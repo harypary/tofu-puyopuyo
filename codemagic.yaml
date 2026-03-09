@@ -52,8 +52,11 @@ workflows:
 
       - name: Set up code signing
         script: |
-          echo "$CM_CERTIFICATE" | base64 --decode > /tmp/cert.p12
-          echo "$CM_PROVISIONING_PROFILE" | base64 --decode > /tmp/profile.mobileprovision
+          echo "$CM_CERTIFICATE" | base64 -d > /tmp/cert.p12
+          echo "$CM_PROVISIONING_PROFILE" | base64 -d > /tmp/profile.mobileprovision
+          # verify files
+          file /tmp/cert.p12
+          file /tmp/profile.mobileprovision
           keychain initialize
           keychain add-certificates \
             --certificate /tmp/cert.p12 \
