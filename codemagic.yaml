@@ -9,21 +9,21 @@ workflows:
         UNITY_VERSION: "6000.3.10f1"
         UNITY_CHANGESET: "e35f0c77bd8e"
         BUNDLE_ID: "com.harypary.tofupuyopuyo"
-        UNITY_HOME: "/Applications/Unity/Hub/Editor/6000.3.10f1/Unity.app/Contents/MacOS"
+        UNITY_HOME: "/Applications/Unity/Unity.app/Contents/MacOS"
         XCODE_SCHEME: "Unity-iPhone"
 
     scripts:
-      - name: Install Unity
+      - name: Install Unity Editor
         script: |
-          # Install Unity Hub
-          brew install --cask unity-hub 2>/dev/null || true
-          # Install Unity Editor + iOS module
-          unity-hub install \
-            --version $UNITY_VERSION \
-            --changeset $UNITY_CHANGESET \
-            --module ios || true
-          # Wait for installation
-          ls "$UNITY_HOME/Unity" || (echo "Unity not found" && exit 1)
+          echo "Downloading Unity $UNITY_VERSION..."
+          curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorInstaller/Unity.pkg" \
+            -o /tmp/Unity.pkg
+          sudo installer -package /tmp/Unity.pkg -target /
+          echo "Downloading iOS Support..."
+          curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorTargetInstaller/UnitySetup-iOS-Support-for-Editor-$UNITY_VERSION.pkg" \
+            -o /tmp/iOSSupport.pkg
+          sudo installer -package /tmp/iOSSupport.pkg -target /
+          ls "$UNITY_HOME/Unity" && echo "Unity installed OK"
 
       - name: Activate Unity License
         script: |
