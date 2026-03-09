@@ -17,40 +17,58 @@ workflows:
     scripts:
       - name: Install Unity Editor
         script: |
-          echo "Downloading Unity $UNITY_VERSION (Intel)..."
-          curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorInstaller/Unity.pkg" \
+          # mac_mini_m2 is ARM64 — use the ARM native installer
+          echo "Downloading Unity $UNITY_VERSION (ARM64 for M2)..."
+          curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorArm64Installer/Unity.pkg" \
             -o /tmp/Unity.pkg
           sudo installer -package /tmp/Unity.pkg -target /
-          echo "Downloading iOS Support..."
+          echo "Downloading iOS Support (ARM64)..."
           curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorTargetInstaller/UnitySetup-iOS-Support-for-Editor-$UNITY_VERSION.pkg" \
             -o /tmp/iOSSupport.pkg
           sudo installer -package /tmp/iOSSupport.pkg -target /
+
+          # Confirm installation
           UNITY_BIN=$(find /Applications -name "Unity" -type f 2>/dev/null | head -1)
           echo "Unity found at: $UNITY_BIN"
+          echo "--- Unity.app structure (top 3 levels) ---"
+          find /Applications/Unity.app -maxdepth 4 -type f -name "*.Client" -o -name "Unity" 2>/dev/null | head -20
           test -n "$UNITY_BIN" && echo "Unity installed OK" || (echo "Unity NOT found" && exit 1)
-
-      - name: Generate Unity activation file
-        script: |
-          UNITY_BIN=$(find /Applications -name "Unity" -type f 2>/dev/null | head -1)
-          echo "Using Unity at: $UNITY_BIN"
-          "$UNITY_BIN" \
-            -batchmode -nographics \
-            -logFile /tmp/unity_activate.log \
-            -createManualActivationFile || true
-          cat /tmp/unity_activate.log || true
-          ls *.alf 2>/dev/null && cp *.alf /tmp/Unity_activation.alf || true
-          ls /tmp/Unity_activation.alf && echo "ALF generated OK" || echo "ALF not found"
 
       - name: Activate Unity License
         script: |
           UNITY_BIN=$(find /Applications -name "Unity" -type f 2>/dev/null | head -1)
-          echo "Using Unity at: $UNITY_BIN"
-          "$UNITY_BIN" \
-            -batchmode -quit -nographics \
-            -logFile /tmp/unity_activate2.log \
-            -username "$UNITY_USERNAME" \
-            -password "$UNITY_PASSWORD" || true
-          cat /tmp/unity_activate2.log || true
+          UNITY_APP=$(find /Applications -name "Unity.app" -type d 2>/dev/null | head -1)
+          echo "Unity bin: $UNITY_BIN"
+          echo "Unity app: $UNITY_APP"
+
+          # Unity 6: Use the bundled Unity Licensing Client
+          # Typically at: Unity.app/Contents/Frameworks/UnityLicensingClient_V1.app/Contents/MacOS/Unity.Licensing.Client
+          ULC=$(find /Applications -name "Unity.Licensing.Client" -type f 2>/dev/null | head -1)
+          echo "Licensing client: $ULC"
+          echo "--- All Licensing.Client binaries found ---"
+          find /Applications -name "*Licensing*" -type f 2>/dev/null || true
+
+          if [ -n "$ULC" ]; then
+            echo "--- Trying Unity Licensing Client (Unity 6 method) ---"
+            "$ULC" --activate-ulf \
+              -username "$UNITY_USERNAME" \
+              -password "$UNITY_PASSWORD" \
+              2>&1 | tee /tmp/unity_ulc.log || true
+            cat /tmp/unity_ulc.log || true
+          else
+            echo "Licensing client not found inside Unity.app, falling back..."
+            # Fallback: old username/password method
+            "$UNITY_BIN" \
+              -batchmode -quit -nographics \
+              -logFile /tmp/unity_activate2.log \
+              -username "$UNITY_USERNAME" \
+              -password "$UNITY_PASSWORD" || true
+            cat /tmp/unity_activate2.log || true
+          fi
+
+          # Show what license files were created
+          find /Library/Application\ Support/Unity -name "*.ulf" 2>/dev/null || true
+          find ~/Library/Application\ Support/Unity -name "*.ulf" 2>/dev/null || true
 
       - name: Build Unity iOS project
         script: |
@@ -85,7 +103,6 @@ workflows:
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
-      - /tmp/Unity_activation.alf
       - /tmp/unity_build.log
-      - /tmp/unity_activate.log
       - /tmp/unity_activate2.log
+      - /tmp/unity_ulc.log
