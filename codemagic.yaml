@@ -9,13 +9,12 @@ workflows:
         UNITY_VERSION: "6000.3.10f1"
         UNITY_CHANGESET: "e35f0c77bd8e"
         BUNDLE_ID: "com.harypary.tofupuyopuyo"
-        UNITY_HOME: "/Applications/Unity/Unity.app/Contents/MacOS"
         XCODE_SCHEME: "Unity-iPhone"
 
     scripts:
       - name: Install Unity Editor
         script: |
-          echo "Downloading Unity $UNITY_VERSION..."
+          echo "Downloading Unity $UNITY_VERSION (Intel)..."
           curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorInstaller/Unity.pkg" \
             -o /tmp/Unity.pkg
           sudo installer -package /tmp/Unity.pkg -target /
@@ -23,9 +22,9 @@ workflows:
           curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorTargetInstaller/UnitySetup-iOS-Support-for-Editor-$UNITY_VERSION.pkg" \
             -o /tmp/iOSSupport.pkg
           sudo installer -package /tmp/iOSSupport.pkg -target /
-          FOUND=$(find /Applications -name "Unity" -type f 2>/dev/null | head -1)
-          echo "Unity found at: $FOUND"
-          test -n "$FOUND" && echo "Unity installed OK" || (echo "Unity NOT found" && exit 1)
+          UNITY_BIN=$(find /Applications -name "Unity" -type f 2>/dev/null | head -1)
+          echo "Unity found at: $UNITY_BIN"
+          test -n "$UNITY_BIN" && echo "Unity installed OK" || (echo "Unity NOT found" && exit 1)
 
       - name: Activate Unity License
         script: |
@@ -39,12 +38,13 @@ workflows:
 
       - name: Build Unity iOS project
         script: |
+          # $CM_BUILD_DIR はリポジトリルート = TofuGame プロジェクトフォルダ
           UNITY_BIN=$(find /Applications -name "Unity" -type f 2>/dev/null | head -1)
           echo "Using Unity at: $UNITY_BIN"
           "$UNITY_BIN" \
             -batchmode -quit -nographics \
             -logFile /dev/stdout \
-            -projectPath "$CM_BUILD_DIR/TofuGame" \
+            -projectPath "$CM_BUILD_DIR" \
             -buildTarget iOS \
             -executeMethod BuildScript.BuildIOS
 
@@ -61,7 +61,7 @@ workflows:
       - name: Build IPA
         script: |
           xcode-project build-ipa \
-            --project "$CM_BUILD_DIR/TofuGame/Builds/iOS/Unity-iPhone.xcodeproj" \
+            --project "$CM_BUILD_DIR/Builds/iOS/Unity-iPhone.xcodeproj" \
             --scheme "$XCODE_SCHEME"
 
     artifacts:
