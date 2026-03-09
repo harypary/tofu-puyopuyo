@@ -86,3 +86,6 @@ workflows:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - /tmp/Unity_activation.alf
+      - /tmp/unity_build.log
+      - /tmp/unity_activate.log
+      - /tmp/unity_activate2.log
