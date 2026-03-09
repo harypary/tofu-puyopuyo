@@ -33,8 +33,9 @@ workflows:
           echo "$UNITY_LICENSE_CONTENT" | tr -d '\r' > /tmp/Unity_lic.ulf
           "$UNITY_BIN" \
             -batchmode -quit -nographics \
-            -logFile /dev/stdout \
+            -logFile /tmp/unity_activate.log \
             -manualLicenseFile /tmp/Unity_lic.ulf || true
+          cat /tmp/unity_activate.log || true
 
       - name: Build Unity iOS project
         script: |
@@ -43,10 +44,11 @@ workflows:
           echo "Using Unity at: $UNITY_BIN"
           "$UNITY_BIN" \
             -batchmode -quit -nographics \
-            -logFile /dev/stdout \
+            -logFile /tmp/unity_build.log \
             -projectPath "$CM_BUILD_DIR" \
             -buildTarget iOS \
             -executeMethod BuildScript.BuildIOS
+          cat /tmp/unity_build.log || true
 
       - name: Set up code signing
         script: |
