@@ -5,6 +5,9 @@ workflows:
     instance_type: mac_mini_m2
 
     environment:
+      groups:
+        - unity_credentials
+        - ios_credentials
       vars:
         UNITY_VERSION: "6000.3.10f1"
         UNITY_CHANGESET: "e35f0c77bd8e"
