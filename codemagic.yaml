@@ -88,6 +88,14 @@ workflows:
           echo "$CM_PROVISIONING_PROFILE" | base64 -d > /tmp/profile.mobileprovision
           file /tmp/cert.p12
           file /tmp/profile.mobileprovision
+
+          # Install provisioning profile by UUID (required for Xcode to find it)
+          PROFILE_UUID=$(security cms -D -i /tmp/profile.mobileprovision | plutil -extract UUID raw -)
+          echo "Profile UUID: $PROFILE_UUID"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$PROFILE_UUID.mobileprovision
+          echo "Profile installed"
+
           keychain initialize
           keychain add-certificates \
             --certificate /tmp/cert.p12 \
