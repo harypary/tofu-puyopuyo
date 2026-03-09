@@ -98,7 +98,9 @@ workflows:
         script: |
           xcode-project build-ipa \
             --project "$CM_BUILD_DIR/Builds/iOS/Unity-iPhone.xcodeproj" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" \
+            --disable-xcpretty \
+            --log-stream stderr
 
     artifacts:
       - build/ios/ipa/*.ipa
