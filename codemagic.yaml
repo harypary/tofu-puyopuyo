@@ -7,22 +7,35 @@ workflows:
     environment:
       vars:
         UNITY_VERSION: "6000.3.10f1"
+        UNITY_CHANGESET: "e35f0c77bd8e"
         BUNDLE_ID: "com.harypary.tofupuyopuyo"
         UNITY_HOME: "/Applications/Unity/Hub/Editor/6000.3.10f1/Unity.app/Contents/MacOS"
         XCODE_SCHEME: "Unity-iPhone"
 
     scripts:
+      - name: Install Unity
+        script: |
+          # Install Unity Hub
+          brew install --cask unity-hub 2>/dev/null || true
+          # Install Unity Editor + iOS module
+          unity-hub install \
+            --version $UNITY_VERSION \
+            --changeset $UNITY_CHANGESET \
+            --module ios || true
+          # Wait for installation
+          ls "$UNITY_HOME/Unity" || (echo "Unity not found" && exit 1)
+
       - name: Activate Unity License
         script: |
           echo "$UNITY_LICENSE_CONTENT" | tr -d '\r' > /tmp/Unity_lic.ulf
-          $UNITY_HOME/Unity \
+          "$UNITY_HOME/Unity" \
             -batchmode -quit -nographics \
             -logFile /dev/stdout \
             -manualLicenseFile /tmp/Unity_lic.ulf || true
 
       - name: Build Unity iOS project
         script: |
-          $UNITY_HOME/Unity \
+          "$UNITY_HOME/Unity" \
             -batchmode -quit -nographics \
             -logFile /dev/stdout \
             -projectPath "$CM_BUILD_DIR/TofuGame" \
