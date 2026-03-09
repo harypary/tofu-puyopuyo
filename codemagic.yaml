@@ -23,19 +23,25 @@ workflows:
           curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorTargetInstaller/UnitySetup-iOS-Support-for-Editor-$UNITY_VERSION.pkg" \
             -o /tmp/iOSSupport.pkg
           sudo installer -package /tmp/iOSSupport.pkg -target /
-          ls "$UNITY_HOME/Unity" && echo "Unity installed OK"
+          FOUND=$(find /Applications -name "Unity" -type f 2>/dev/null | head -1)
+          echo "Unity found at: $FOUND"
+          test -n "$FOUND" && echo "Unity installed OK" || (echo "Unity NOT found" && exit 1)
 
       - name: Activate Unity License
         script: |
+          UNITY_BIN=$(find /Applications -name "Unity" -type f 2>/dev/null | head -1)
+          echo "Using Unity at: $UNITY_BIN"
           echo "$UNITY_LICENSE_CONTENT" | tr -d '\r' > /tmp/Unity_lic.ulf
-          "$UNITY_HOME/Unity" \
+          "$UNITY_BIN" \
             -batchmode -quit -nographics \
             -logFile /dev/stdout \
             -manualLicenseFile /tmp/Unity_lic.ulf || true
 
       - name: Build Unity iOS project
         script: |
-          "$UNITY_HOME/Unity" \
+          UNITY_BIN=$(find /Applications -name "Unity" -type f 2>/dev/null | head -1)
+          echo "Using Unity at: $UNITY_BIN"
+          "$UNITY_BIN" \
             -batchmode -quit -nographics \
             -logFile /dev/stdout \
             -projectPath "$CM_BUILD_DIR/TofuGame" \
