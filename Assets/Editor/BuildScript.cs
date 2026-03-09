@@ -6,7 +6,7 @@ public class BuildScript
 {
     public static void BuildIOS()
     {
-        PlayerSettings.bundleIdentifier = "com.harypary.tofupuyopuyo";
+        PlayerSettings.applicationIdentifier = "com.harypary.tofupuyopuyo";
 
         var options = new BuildPlayerOptions
         {
