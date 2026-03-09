@@ -10,9 +10,6 @@ workflows:
         BUNDLE_ID: "com.harypary.tofupuyopuyo"
         UNITY_HOME: "/Applications/Unity/Hub/Editor/6000.3.10f1/Unity.app/Contents/MacOS"
         XCODE_SCHEME: "Unity-iPhone"
-      groups:
-        - unity_credentials   # UNITY_LICENSE_CONTENT
-        - ios_credentials     # CM_CERTIFICATE, CM_CERTIFICATE_PASSWORD, CM_PROVISIONING_PROFILE
 
     scripts:
       - name: Activate Unity License
