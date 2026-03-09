@@ -1,0 +1,53 @@
+workflows:
+  unity-ios:
+    name: Unity iOS Build
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    environment:
+      vars:
+        UNITY_VERSION: "6000.3.10f1"
+        BUNDLE_ID: "com.harypary.tofupuyopuyo"
+        UNITY_HOME: "/Applications/Unity/Hub/Editor/6000.3.10f1/Unity.app/Contents/MacOS"
+        XCODE_SCHEME: "Unity-iPhone"
+      groups:
+        - unity_credentials   # UNITY_LICENSE_CONTENT
+        - ios_credentials     # CM_CERTIFICATE, CM_CERTIFICATE_PASSWORD, CM_PROVISIONING_PROFILE
+
+    scripts:
+      - name: Activate Unity License
+        script: |
+          echo "$UNITY_LICENSE_CONTENT" | tr -d '\r' > /tmp/Unity_lic.ulf
+          $UNITY_HOME/Unity \
+            -batchmode -quit -nographics \
+            -logFile /dev/stdout \
+            -manualLicenseFile /tmp/Unity_lic.ulf || true
+
+      - name: Build Unity iOS project
+        script: |
+          $UNITY_HOME/Unity \
+            -batchmode -quit -nographics \
+            -logFile /dev/stdout \
+            -projectPath "$CM_BUILD_DIR/TofuGame" \
+            -buildTarget iOS \
+            -executeMethod BuildScript.BuildIOS
+
+      - name: Set up code signing
+        script: |
+          echo "$CM_CERTIFICATE" | base64 --decode > /tmp/cert.p12
+          echo "$CM_PROVISIONING_PROFILE" | base64 --decode > /tmp/profile.mobileprovision
+          keychain initialize
+          keychain add-certificates \
+            --certificate /tmp/cert.p12 \
+            --certificate-password "$CM_CERTIFICATE_PASSWORD"
+          xcode-project use-profiles --profile /tmp/profile.mobileprovision
+
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/TofuGame/Builds/iOS/Unity-iPhone.xcodeproj" \
+            --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
