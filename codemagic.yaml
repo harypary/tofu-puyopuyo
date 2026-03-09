@@ -17,8 +17,7 @@ workflows:
     scripts:
       - name: Install Unity Editor
         script: |
-          # ARM64 pkg not available for this version — use Intel (runs via Rosetta 2 on M2)
-          echo "Downloading Unity $UNITY_VERSION (Intel/Rosetta2)..."
+          echo "Downloading Unity $UNITY_VERSION..."
           curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorInstaller/Unity.pkg" \
             -o /tmp/Unity.pkg
           sudo installer -package /tmp/Unity.pkg -target /
@@ -26,49 +25,22 @@ workflows:
           curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorTargetInstaller/UnitySetup-iOS-Support-for-Editor-$UNITY_VERSION.pkg" \
             -o /tmp/iOSSupport.pkg
           sudo installer -package /tmp/iOSSupport.pkg -target /
-
-          # Confirm installation
           UNITY_BIN=$(find /Applications -name "Unity" -type f 2>/dev/null | head -1)
           echo "Unity found at: $UNITY_BIN"
-          echo "--- Unity.app structure (top 3 levels) ---"
-          find /Applications/Unity.app -maxdepth 4 -type f -name "*.Client" -o -name "Unity" 2>/dev/null | head -20
           test -n "$UNITY_BIN" && echo "Unity installed OK" || (echo "Unity NOT found" && exit 1)
 
       - name: Activate Unity License
         script: |
-          UNITY_BIN=$(find /Applications -name "Unity" -type f 2>/dev/null | head -1)
-          UNITY_APP=$(find /Applications -name "Unity.app" -type d 2>/dev/null | head -1)
-          echo "Unity bin: $UNITY_BIN"
-          echo "Unity app: $UNITY_APP"
-
-          # Unity 6: Use the bundled Unity Licensing Client
-          # Typically at: Unity.app/Contents/Frameworks/UnityLicensingClient_V1.app/Contents/MacOS/Unity.Licensing.Client
           ULC=$(find /Applications -name "Unity.Licensing.Client" -type f 2>/dev/null | head -1)
           echo "Licensing client: $ULC"
-          echo "--- All Licensing.Client binaries found ---"
-          find /Applications -name "*Licensing*" -type f 2>/dev/null || true
-
-          if [ -n "$ULC" ]; then
-            echo "--- Trying Unity Licensing Client (Unity 6 method) ---"
-            "$ULC" --activate-ulf \
-              --username "$UNITY_USERNAME" \
-              --password "$UNITY_PASSWORD" \
-              2>&1 | tee /tmp/unity_ulc.log || true
-            cat /tmp/unity_ulc.log || true
-          else
-            echo "Licensing client not found inside Unity.app, falling back..."
-            # Fallback: old username/password method
-            "$UNITY_BIN" \
-              -batchmode -quit -nographics \
-              -logFile /tmp/unity_activate2.log \
-              -username "$UNITY_USERNAME" \
-              -password "$UNITY_PASSWORD" || true
-            cat /tmp/unity_activate2.log || true
+          if [ -z "$ULC" ]; then
+            echo "ERROR: Unity.Licensing.Client not found" && exit 1
           fi
-
-          # Show what license files were created
-          find /Library/Application\ Support/Unity -name "*.ulf" 2>/dev/null || true
-          find ~/Library/Application\ Support/Unity -name "*.ulf" 2>/dev/null || true
+          "$ULC" --activate-ulf \
+            --username "$UNITY_USERNAME" \
+            --password "$UNITY_PASSWORD" \
+            2>&1 | tee /tmp/unity_ulc.log
+          cat /tmp/unity_ulc.log
 
       - name: Build Unity iOS project
         script: |
@@ -82,36 +54,38 @@ workflows:
             -executeMethod BuildScript.BuildIOS
           cat /tmp/unity_build.log || true
 
+          PBXPROJ="$CM_BUILD_DIR/Builds/iOS/Unity-iPhone.xcodeproj/project.pbxproj"
+          test -f "$PBXPROJ" || (echo "xcodeproj not found" && exit 1)
+          echo "xcodeproj generated OK"
+
       - name: Set up code signing
         script: |
           echo "$CM_CERTIFICATE" | base64 -d > /tmp/cert.p12
           echo "$CM_PROVISIONING_PROFILE" | base64 -d > /tmp/profile.mobileprovision
-          file /tmp/cert.p12
-          file /tmp/profile.mobileprovision
 
-          # Install provisioning profile by UUID
+          # Install provisioning profile by UUID so Xcode can find it
           PROFILE_UUID=$(security cms -D -i /tmp/profile.mobileprovision | plutil -extract UUID raw -)
           echo "Profile UUID: $PROFILE_UUID"
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$PROFILE_UUID.mobileprovision
-          echo "Profile installed"
 
-          # Import certificate directly into login keychain
-          security import /tmp/cert.p12 \
-            -k ~/Library/Keychains/login.keychain-db \
-            -P "$CM_CERTIFICATE_PASSWORD" \
-            -T /usr/bin/codesign \
-            -T /usr/bin/xcodebuild
-          # Allow codesign to access the key without prompting
-          security set-key-partition-list \
-            -S apple-tool:,apple:,codesign: \
-            -s -k "" \
-            ~/Library/Keychains/login.keychain-db || true
-          # Verify certificate is visible
+          # Import certificate
+          keychain initialize || true
+          keychain add-certificates \
+            --certificate /tmp/cert.p12 \
+            --certificate-password "$CM_CERTIFICATE_PASSWORD"
+
           echo "--- Available signing identities ---"
           security find-identity -v -p codesigning
 
+          # Update xcodeproj signing settings based on profile
           xcode-project use-profiles --profile /tmp/profile.mobileprovision
+
+          # Patch any remaining old-style identity names AFTER use-profiles
+          PBXPROJ="$CM_BUILD_DIR/Builds/iOS/Unity-iPhone.xcodeproj/project.pbxproj"
+          sed -i '' 's/iPhone Distribution/Apple Distribution/g' "$PBXPROJ"
+          sed -i '' 's/iOS Distribution/Apple Distribution/g' "$PBXPROJ"
+          echo "Signing identity patch applied"
 
       - name: Build IPA
         script: |
@@ -123,7 +97,5 @@ workflows:
 
     artifacts:
       - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
       - /tmp/unity_build.log
-      - /tmp/unity_activate2.log
       - /tmp/unity_ulc.log
