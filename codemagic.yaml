@@ -17,12 +17,12 @@ workflows:
     scripts:
       - name: Install Unity Editor
         script: |
-          # mac_mini_m2 is ARM64 — use the ARM native installer
-          echo "Downloading Unity $UNITY_VERSION (ARM64 for M2)..."
-          curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorArm64Installer/Unity.pkg" \
+          # ARM64 pkg not available for this version — use Intel (runs via Rosetta 2 on M2)
+          echo "Downloading Unity $UNITY_VERSION (Intel/Rosetta2)..."
+          curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorInstaller/Unity.pkg" \
             -o /tmp/Unity.pkg
           sudo installer -package /tmp/Unity.pkg -target /
-          echo "Downloading iOS Support (ARM64)..."
+          echo "Downloading iOS Support..."
           curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorTargetInstaller/UnitySetup-iOS-Support-for-Editor-$UNITY_VERSION.pkg" \
             -o /tmp/iOSSupport.pkg
           sudo installer -package /tmp/iOSSupport.pkg -target /
