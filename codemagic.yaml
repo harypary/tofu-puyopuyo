@@ -67,15 +67,12 @@ workflows:
       - name: Install CocoaPods dependencies
         script: |
           cd "$CM_BUILD_DIR/Builds/iOS"
+          # Disable signing for all Pod targets via post_install hook
+          printf '\npost_install do |installer|\n  installer.pods_project.targets.each do |target|\n    target.build_configurations.each do |config|\n      config.build_settings["CODE_SIGNING_ALLOWED"] = "NO"\n    end\n  end\nend\n' >> Podfile
+          echo "post_install hook added to Podfile"
           pod install --no-repo-update
           echo "Pods installed"
           ls -la
-          # Disable code signing for Pod targets to avoid provisioning profile conflicts
-          PODS_PBXPROJ="$CM_BUILD_DIR/Builds/iOS/Pods/Pods.xcodeproj/project.pbxproj"
-          if [ -f "$PODS_PBXPROJ" ]; then
-            perl -i -pe 's/CODE_SIGN_IDENTITY = "[^"]*";/CODE_SIGN_IDENTITY = "";/g' "$PODS_PBXPROJ"
-            echo "Pods signing cleared"
-          fi
 
       - name: Set up code signing
         script: |
@@ -175,6 +172,7 @@ workflows:
             archive \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="47BSX989JQ" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
             > /tmp/xcodebuild_archive.log 2>&1 \
             || (cat /tmp/xcodebuild_archive.log && echo "Archive failed" && exit 1)
 
