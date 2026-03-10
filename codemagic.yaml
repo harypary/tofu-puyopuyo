@@ -122,10 +122,12 @@ workflows:
 
           # Generate export_options.plist manually (in case use-profiles didn't create it)
           PROFILE_UUID_VAL=$(cat /tmp/profile_uuid.txt)
-          cat > /Users/builder/export_options.plist << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
+          python3 -c "
+import sys
+uuid = sys.argv[1]
+content = '''<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
 <dict>
     <key>method</key>
     <string>app-store-connect</string>
@@ -138,11 +140,13 @@ workflows:
     <key>provisioningProfiles</key>
     <dict>
         <key>com.harypary.tofupuyopuyo</key>
-        <string>$PROFILE_UUID_VAL</string>
+        <string>{uuid}</string>
     </dict>
 </dict>
-</plist>
-EOF
+</plist>'''.format(uuid=uuid)
+with open('/Users/builder/export_options.plist', 'w') as f:
+    f.write(content)
+" "$PROFILE_UUID_VAL"
           echo "export_options.plist created"
 
       - name: Build IPA
