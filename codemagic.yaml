@@ -130,18 +130,13 @@ workflows:
           echo "--- CODE_SIGN_IDENTITY after patch ---"
           grep "CODE_SIGN_IDENTITY" "$PBXPROJ" | head -10
 
-          # Generate export_options.plist using PlistBuddy (macOS built-in)
+          # Generate export_options.plist using printf (guaranteed valid XML plist)
           PROFILE_UUID_VAL=$(cat /tmp/profile_uuid.txt)
-          PLIST=/Users/builder/export_options.plist
-          rm -f "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :method string app-store-connect" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :teamID string 47BSX989JQ" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :signingCertificate string Apple Distribution" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.harypary.tofupuyopuyo string $PROFILE_UUID_VAL" "$PLIST"
+          PLIST=/tmp/export_options.plist
+          printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n\t<key>method</key>\n\t<string>app-store-connect</string>\n\t<key>teamID</key>\n\t<string>47BSX989JQ</string>\n\t<key>signingStyle</key>\n\t<string>manual</string>\n\t<key>signingCertificate</key>\n\t<string>Apple Distribution</string>\n\t<key>provisioningProfiles</key>\n\t<dict>\n\t\t<key>com.harypary.tofupuyopuyo</key>\n\t\t<string>%s</string>\n\t</dict>\n</dict>\n</plist>\n' "$PROFILE_UUID_VAL" > "$PLIST"
           echo "export_options.plist created:"
           cat "$PLIST"
+          plutil -lint "$PLIST" && echo "plist is valid" || (echo "plist INVALID" && exit 1)
 
       - name: Build IPA
         script: |
@@ -159,7 +154,7 @@ workflows:
           xcode-project build-ipa \
             $XCODE_PATH_ARG \
             --scheme "$XCODE_SCHEME" \
-            --export-options-plist /Users/builder/export_options.plist \
+            --export-options-plist /tmp/export_options.plist \
             --archive-xcargs "CODE_SIGN_IDENTITY='Apple Distribution' PROVISIONING_PROFILE_SPECIFIER='$PROFILE_UUID'" \
             --disable-xcpretty \
             --log-stream stderr
