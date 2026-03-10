@@ -126,23 +126,28 @@ workflows:
               --profile /tmp/profile.mobileprovision || true
           fi
 
-          # Force Apple Distribution in pbxproj (handles all variants including [sdk=iphoneos*])
+          # Patch pbxproj signing settings
           PBXPROJ="$IOS_DIR/Unity-iPhone.xcodeproj/project.pbxproj"
+          # CODE_SIGN_IDENTITY: force Apple Distribution (quoted and unquoted, with optional [sdk=...])
           perl -i -pe 's/CODE_SIGN_IDENTITY(\[.*?\])? = "[^"]+"/CODE_SIGN_IDENTITY = "Apple Distribution"/g' "$PBXPROJ"
           perl -i -pe 's/"CODE_SIGN_IDENTITY(\[.*?\])?" = "[^"]+"/CODE_SIGN_IDENTITY = "Apple Distribution"/g' "$PBXPROJ"
-          # Force Manual signing for all targets (eliminates Automatic vs distribution cert conflict)
-          perl -i -pe 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' "$PBXPROJ"
-          # Set DEVELOPMENT_TEAM for all targets
-          perl -i -pe 's/DEVELOPMENT_TEAM = [A-Z0-9"]*;/DEVELOPMENT_TEAM = 47BSX989JQ;/g' "$PBXPROJ"
-          # Clear any existing PROVISIONING_PROFILE_SPECIFIER (frameworks don't use profiles)
-          perl -i -pe 's/PROVISIONING_PROFILE_SPECIFIER = "[^"]*";/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$PBXPROJ"
-          # Set PROVISIONING_PROFILE_SPECIFIER only for Unity-iPhone (by bundle ID, quoted or unquoted)
+          # CODE_SIGN_STYLE: force Manual (handles both Automatic and "Automatic")
+          perl -i -pe 's/CODE_SIGN_STYLE = "?Automatic"?;/CODE_SIGN_STYLE = Manual;/g' "$PBXPROJ"
+          # DEVELOPMENT_TEAM: set for all targets (handles any existing value)
+          perl -i -pe 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = 47BSX989JQ;/g' "$PBXPROJ"
+          # PROVISIONING_PROFILE_SPECIFIER: delete ALL existing lines to avoid duplicates
+          perl -i -pe '/PROVISIONING_PROFILE_SPECIFIER/d' "$PBXPROJ"
+          # Diagnostic: show PRODUCT_BUNDLE_IDENTIFIER format in this project
+          echo "--- PRODUCT_BUNDLE_IDENTIFIER lines ---"
+          grep "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ" | head -5
+          # Insert PROVISIONING_PROFILE_SPECIFIER only for the main app target (by bundle ID)
           PROFILE_UUID_CURR=$(cat /tmp/profile_uuid.txt)
+          echo "Inserting PROVISIONING_PROFILE_SPECIFIER: $PROFILE_UUID_CURR"
           perl -i -0pe "s/(PRODUCT_BUNDLE_IDENTIFIER = \"?com\\.harypary\\.tofupuyopuyo\"?;)/\$1\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID_CURR\";/g" "$PBXPROJ"
           echo "--- PROVISIONING_PROFILE_SPECIFIER after patch ---"
-          grep "PROVISIONING_PROFILE_SPECIFIER" "$PBXPROJ" | head -10
-          echo "--- CODE_SIGN_IDENTITY after patch ---"
-          grep "CODE_SIGN_IDENTITY" "$PBXPROJ" | head -10
+          grep "PROVISIONING_PROFILE_SPECIFIER" "$PBXPROJ" | head -5
+          echo "--- CODE_SIGN_STYLE after patch ---"
+          grep "CODE_SIGN_STYLE" "$PBXPROJ" | head -5
 
           # Generate export_options.plist using python3 (same parser as xcode-project)
           PROFILE_UUID_VAL=$(cat /tmp/profile_uuid.txt)
