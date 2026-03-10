@@ -73,6 +73,8 @@ workflows:
           pod install --no-repo-update
           echo "Pods installed"
           ls -la
+          test -d "$CM_BUILD_DIR/Builds/iOS/Unity-iPhone.xcworkspace" || (echo "ERROR: xcworkspace not created by pod install" && exit 1)
+          echo "xcworkspace OK"
 
       - name: Set up code signing
         script: |
@@ -133,7 +135,7 @@ workflows:
           perl -i -pe 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = 47BSX989JQ;/g' "$PBXPROJ"
 
           # PROVISIONING_PROFILE_SPECIFIER: delete all existing lines to avoid duplicates
-          perl -i -pe '/PROVISIONING_PROFILE_SPECIFIER/d' "$PBXPROJ"
+          perl -i -ne 'print unless /PROVISIONING_PROFILE_SPECIFIER/' "$PBXPROJ"
 
           # Show PRODUCT_BUNDLE_IDENTIFIER format for diagnosis
           echo "--- PRODUCT_BUNDLE_IDENTIFIER lines ---"
@@ -143,6 +145,9 @@ workflows:
           PROFILE_UUID_CURR=$(cat /tmp/profile_uuid.txt)
           echo "Inserting PROVISIONING_PROFILE_SPECIFIER=$PROFILE_UUID_CURR for main app..."
           perl -i -0pe "s/(PRODUCT_BUNDLE_IDENTIFIER = \"?com\\.harypary\\.tofupuyopuyo\"?;)/\$1\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID_CURR\";/g" "$PBXPROJ"
+
+          # Remove any CocoaPods xcconfig variable references that override the UUID
+          perl -i -ne 'print unless /PROVISIONING_PROFILE_SPECIFIER.*\$\(PROVISIONING_PROFILE_SPECIFIER/' "$PBXPROJ"
 
           # Verify insertion succeeded
           SPECIFIER_COUNT=$(grep -c "PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID_CURR\"" "$PBXPROJ" 2>/dev/null || echo 0)
@@ -189,8 +194,8 @@ workflows:
           if [ -d "$IOS_DIR/Unity-iPhone.xcworkspace" ]; then
             WORKSPACE_ARG="-workspace $IOS_DIR/Unity-iPhone.xcworkspace"
           else
-            echo "WARNING: xcworkspace not found, falling back to xcodeproj"
-            WORKSPACE_ARG="-project $IOS_DIR/Unity-iPhone.xcodeproj"
+            echo "ERROR: xcworkspace not found — CocoaPods may not have run correctly"
+            exit 1
           fi
           echo "Using: $WORKSPACE_ARG"
 
@@ -203,8 +208,10 @@ workflows:
             -configuration Release \
             -archivePath "$ARCHIVE_PATH" \
             archive \
+            CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="47BSX989JQ" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
             OTHER_CODE_SIGN_FLAGS="--keychain $HOME/Library/Keychains/login.keychain-db" \
             > /tmp/xcodebuild_archive.log 2>&1
           ARCHIVE_EXIT=$?
