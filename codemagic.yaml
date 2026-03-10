@@ -71,21 +71,7 @@ workflows:
           echo "AppIcon.appiconset: $APPICONSET"
           if [ -n "$APPICONSET" ] && [ -f "$ICON_SRC" ]; then
             cp "$ICON_SRC" "$APPICONSET/Icon-1024.png"
-            python3 -c "
-import json, os
-path = os.environ['APPICONSET'] + '/Contents.json'
-with open(path) as f: data = json.load(f)
-found = False
-for img in data['images']:
-    if img.get('idiom') == 'ios-marketing':
-        img['filename'] = 'Icon-1024.png'
-        found = True
-        break
-if not found:
-    data['images'].append({'filename': 'Icon-1024.png', 'idiom': 'ios-marketing', 'scale': '1x', 'size': '1024x1024'})
-with open(path, 'w') as f: json.dump(data, f, indent=2)
-print('App Store icon injected into asset catalog')
-" APPICONSET="$APPICONSET"
+            python3 -c "import json,os,sys; p=sys.argv[1]+'/Contents.json'; d=json.load(open(p)); imgs=[i for i in d['images'] if i.get('idiom')!='ios-marketing']; imgs.append({'filename':'Icon-1024.png','idiom':'ios-marketing','scale':'1x','size':'1024x1024'}); d['images']=imgs; json.dump(d,open(p,'w'),indent=2); print('icon injected')" "$APPICONSET"
           else
             echo "WARNING: AppIcon.appiconset or AppIcon.png not found, skipping icon injection"
           fi
