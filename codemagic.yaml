@@ -13,6 +13,7 @@ workflows:
       groups:
         - unity_credentials
         - ios_credentials
+        - app_store_connect
       vars:
         UNITY_VERSION: "6000.3.10f1"
         UNITY_CHANGESET: "e35f0c77bd8e"
@@ -248,3 +249,10 @@ workflows:
       - /tmp/unity_ulc.log
       - /tmp/xcodebuild_archive.log
       - /tmp/xcodebuild_export.log
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
