@@ -100,25 +100,68 @@ workflows:
           fi
           echo "Certificate verified OK"
 
-          # Update xcodeproj signing settings
-          xcode-project use-profiles \
-            --workspace "$CM_BUILD_DIR/Builds/iOS/Unity-iPhone.xcworkspace" \
-            --profile /tmp/profile.mobileprovision || true
+          # Update xcodeproj signing settings (try xcworkspace first, fall back to xcodeproj)
+          IOS_DIR="$CM_BUILD_DIR/Builds/iOS"
+          if [ -d "$IOS_DIR/Unity-iPhone.xcworkspace" ]; then
+            xcode-project use-profiles \
+              --workspace "$IOS_DIR/Unity-iPhone.xcworkspace" \
+              --profile /tmp/profile.mobileprovision || true
+          else
+            echo "xcworkspace not found, using xcodeproj"
+            xcode-project use-profiles \
+              --project "$IOS_DIR/Unity-iPhone.xcodeproj" \
+              --profile /tmp/profile.mobileprovision || true
+          fi
 
           # Force Apple Distribution in pbxproj (handles all variants including [sdk=iphoneos*])
-          PBXPROJ="$CM_BUILD_DIR/Builds/iOS/Unity-iPhone.xcodeproj/project.pbxproj"
+          PBXPROJ="$IOS_DIR/Unity-iPhone.xcodeproj/project.pbxproj"
           perl -i -pe 's/CODE_SIGN_IDENTITY(\[.*?\])? = "[^"]+"/CODE_SIGN_IDENTITY = "Apple Distribution"/g' "$PBXPROJ"
           perl -i -pe 's/"CODE_SIGN_IDENTITY(\[.*?\])?" = "[^"]+"/CODE_SIGN_IDENTITY = "Apple Distribution"/g' "$PBXPROJ"
           echo "--- CODE_SIGN_IDENTITY after patch ---"
           grep "CODE_SIGN_IDENTITY" "$PBXPROJ" | head -10
 
+          # Generate export_options.plist manually (in case use-profiles didn't create it)
+          PROFILE_UUID_VAL=$(cat /tmp/profile_uuid.txt)
+          cat > /Users/builder/export_options.plist << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store-connect</string>
+    <key>teamID</key>
+    <string>47BSX989JQ</string>
+    <key>signingStyle</key>
+    <string>manual</string>
+    <key>signingCertificate</key>
+    <string>Apple Distribution</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>com.harypary.tofupuyopuyo</key>
+        <string>$PROFILE_UUID_VAL</string>
+    </dict>
+</dict>
+</plist>
+EOF
+          echo "export_options.plist created"
+
       - name: Build IPA
         script: |
           PROFILE_UUID=$(cat /tmp/profile_uuid.txt)
+          IOS_DIR="$CM_BUILD_DIR/Builds/iOS"
           echo "Building IPA with profile UUID: $PROFILE_UUID"
+
+          if [ -d "$IOS_DIR/Unity-iPhone.xcworkspace" ]; then
+            XCODE_PATH_ARG="--workspace $IOS_DIR/Unity-iPhone.xcworkspace"
+          else
+            echo "xcworkspace not found, using xcodeproj"
+            XCODE_PATH_ARG="--project $IOS_DIR/Unity-iPhone.xcodeproj"
+          fi
+
           xcode-project build-ipa \
-            --workspace "$CM_BUILD_DIR/Builds/iOS/Unity-iPhone.xcworkspace" \
+            $XCODE_PATH_ARG \
             --scheme "$XCODE_SCHEME" \
+            --export-options-plist /Users/builder/export_options.plist \
             --archive-xcargs "CODE_SIGN_IDENTITY='Apple Distribution' PROVISIONING_PROFILE_SPECIFIER='$PROFILE_UUID'" \
             --disable-xcpretty \
             --log-stream stderr
