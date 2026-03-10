@@ -149,19 +149,33 @@ workflows:
           echo "PROVISIONING_PROFILE_SPECIFIER inserted $SPECIFIER_COUNT time(s)"
           if [ "$SPECIFIER_COUNT" = "0" ]; then
             echo "ERROR: Failed to insert PROVISIONING_PROFILE_SPECIFIER — PRODUCT_BUNDLE_IDENTIFIER format mismatch"
+            echo "=== ALL PRODUCT_BUNDLE_IDENTIFIER lines ==="
             grep "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ"
             exit 1
           fi
 
-          echo "--- CODE_SIGN_STYLE after patch ---"
-          grep "CODE_SIGN_STYLE" "$PBXPROJ" | head -5
-          echo "--- PROVISIONING_PROFILE_SPECIFIER after patch ---"
-          grep "PROVISIONING_PROFILE_SPECIFIER" "$PBXPROJ" | head -5
+          echo "=== Full signing state after all patches ==="
+          echo "--- CODE_SIGN_STYLE ---"
+          grep "CODE_SIGN_STYLE" "$PBXPROJ"
+          echo "--- CODE_SIGN_IDENTITY ---"
+          grep "CODE_SIGN_IDENTITY" "$PBXPROJ"
+          echo "--- DEVELOPMENT_TEAM ---"
+          grep "DEVELOPMENT_TEAM" "$PBXPROJ"
+          echo "--- PROVISIONING_PROFILE_SPECIFIER ---"
+          grep "PROVISIONING_PROFILE_SPECIFIER" "$PBXPROJ"
+
+          # Show provisioning profile details
+          echo "=== Provisioning profile info ==="
+          security cms -D -i /tmp/profile.mobileprovision | plutil -extract Name raw - || true
+          security cms -D -i /tmp/profile.mobileprovision | plutil -extract ExpirationDate raw - || true
+          security cms -D -i /tmp/profile.mobileprovision | plutil -extract Entitlements.application-identifier raw - || true
 
           # Generate export_options.plist
           PROFILE_UUID_VAL=$(cat /tmp/profile_uuid.txt)
           PLIST="$CM_BUILD_DIR/export_options.plist"
           python3 -c "import plistlib,sys; d={'method':'app-store-connect','teamID':'47BSX989JQ','signingStyle':'manual','signingCertificate':'Apple Distribution','provisioningProfiles':{'com.harypary.tofupuyopuyo':sys.argv[1]}}; open(sys.argv[2],'wb').write(plistlib.dumps(d,fmt=plistlib.FMT_XML)); print('plist written')" "$PROFILE_UUID_VAL" "$PLIST"
+          echo "=== export_options.plist ==="
+          cat "$PLIST"
           plutil -lint "$PLIST" && echo "export_options.plist OK" || (echo "export_options.plist INVALID" && exit 1)
 
       - name: Build IPA
@@ -192,9 +206,16 @@ workflows:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="47BSX989JQ" \
             OTHER_CODE_SIGN_FLAGS="--keychain $HOME/Library/Keychains/login.keychain-db" \
-            > /tmp/xcodebuild_archive.log 2>&1 \
-            || (grep "error:" /tmp/xcodebuild_archive.log | tail -20 && echo "Archive failed" && exit 1)
-
+            > /tmp/xcodebuild_archive.log 2>&1
+          ARCHIVE_EXIT=$?
+          if [ $ARCHIVE_EXIT -ne 0 ]; then
+            echo "=== Archive errors ==="
+            grep -E "error:|warning: .*requires|conflicting|does not support" /tmp/xcodebuild_archive.log || true
+            echo "=== Last 30 lines of archive log ==="
+            tail -30 /tmp/xcodebuild_archive.log
+            echo "Archive failed (exit $ARCHIVE_EXIT)"
+            exit 1
+          fi
           echo "Archive succeeded"
 
           # Export IPA
@@ -203,8 +224,14 @@ workflows:
             -archivePath "$ARCHIVE_PATH" \
             -exportPath "$EXPORT_PATH" \
             -exportOptionsPlist "$CM_BUILD_DIR/export_options.plist" \
-            > /tmp/xcodebuild_export.log 2>&1 \
-            || (cat /tmp/xcodebuild_export.log && echo "Export failed" && exit 1)
+            > /tmp/xcodebuild_export.log 2>&1
+          EXPORT_EXIT=$?
+          if [ $EXPORT_EXIT -ne 0 ]; then
+            echo "=== Export log ==="
+            cat /tmp/xcodebuild_export.log
+            echo "Export failed (exit $EXPORT_EXIT)"
+            exit 1
+          fi
 
           echo "--- IPA files ---"
           ls -la "$EXPORT_PATH"
