@@ -164,6 +164,7 @@ workflows:
             -archivePath "$ARCHIVE_PATH" \
             archive \
             CODE_SIGN_IDENTITY="Apple Distribution" \
+            DEVELOPMENT_TEAM="47BSX989JQ" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
             > /tmp/xcodebuild_archive.log 2>&1 \
             || (cat /tmp/xcodebuild_archive.log && echo "Archive failed" && exit 1)
