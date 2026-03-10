@@ -7,6 +7,8 @@ public class BuildScript
     public static void BuildIOS()
     {
         PlayerSettings.applicationIdentifier = "com.harypary.tofupuyopuyo";
+        PlayerSettings.bundleVersion = "1.0";
+        PlayerSettings.iOS.buildNumber = Environment.GetEnvironmentVariable("BUILD_NUMBER") ?? "1";
 
         var options = new BuildPlayerOptions
         {
