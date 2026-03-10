@@ -137,7 +137,7 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :method string app-store-connect" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :teamID string 47BSX989JQ" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :signingCertificate string 'Apple Distribution'" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :signingCertificate string Apple Distribution" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.harypary.tofupuyopuyo string $PROFILE_UUID_VAL" "$PLIST"
           echo "export_options.plist created:"
