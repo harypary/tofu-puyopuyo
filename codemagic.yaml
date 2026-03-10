@@ -67,7 +67,7 @@ workflows:
       - name: Install CocoaPods dependencies
         script: |
           cd "$CM_BUILD_DIR/Builds/iOS"
-          # Disable signing for all Pod targets via post_install hook
+          # Disable signing for all Pod targets via post_install hook (before pod install)
           printf '\npost_install do |installer|\n  installer.pods_project.targets.each do |target|\n    target.build_configurations.each do |config|\n      config.build_settings["CODE_SIGNING_ALLOWED"] = "NO"\n    end\n  end\nend\n' >> Podfile
           echo "post_install hook added to Podfile"
           pod install --no-repo-update
@@ -79,20 +79,20 @@ workflows:
           echo "$CM_CERTIFICATE" | base64 -d > /tmp/cert.p12
           echo "$CM_PROVISIONING_PROFILE" | base64 -d > /tmp/profile.mobileprovision
 
-          # Install provisioning profile by UUID
+          # Extract and install provisioning profile
           PROFILE_UUID=$(security cms -D -i /tmp/profile.mobileprovision | plutil -extract UUID raw -)
           echo "Profile UUID: $PROFILE_UUID"
           echo "$PROFILE_UUID" > /tmp/profile_uuid.txt
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$PROFILE_UUID.mobileprovision
 
-          # Method 1: Codemagic keychain tool
+          # Import certificate via Codemagic keychain tool
           keychain initialize || true
           keychain add-certificates \
             --certificate /tmp/cert.p12 \
             --certificate-password "$CM_CERTIFICATE_PASSWORD" || true
 
-          # Method 2: Direct import as fallback (-A = allow all apps to use the key)
+          # Import certificate directly to login keychain as fallback
           security import /tmp/cert.p12 \
             -k ~/Library/Keychains/login.keychain-db \
             -P "$CM_CERTIFICATE_PASSWORD" \
@@ -104,7 +104,12 @@ workflows:
             -s -k "" \
             ~/Library/Keychains/login.keychain-db 2>/dev/null || true
 
-          # Verify — fail the build if no certificate found
+          # Ensure login keychain is in the search list
+          security list-keychains -d user -s \
+            ~/Library/Keychains/login.keychain-db \
+            $(security list-keychains -d user | tr -d '"' | tr '\n' ' ') || true
+
+          # Verify certificate
           echo "--- Available signing identities ---"
           security find-identity -v -p codesigning
           if ! security find-identity -v -p codesigning | grep -q "Apple Distribution\|iPhone Distribution"; then
@@ -113,51 +118,51 @@ workflows:
           fi
           echo "Certificate verified OK"
 
-          # Update xcodeproj signing settings (try xcworkspace first, fall back to xcodeproj)
-          IOS_DIR="$CM_BUILD_DIR/Builds/iOS"
-          if [ -d "$IOS_DIR/Unity-iPhone.xcworkspace" ]; then
-            xcode-project use-profiles \
-              --workspace "$IOS_DIR/Unity-iPhone.xcworkspace" \
-              --profile /tmp/profile.mobileprovision || true
-          else
-            echo "xcworkspace not found, using xcodeproj"
-            xcode-project use-profiles \
-              --project "$IOS_DIR/Unity-iPhone.xcodeproj" \
-              --profile /tmp/profile.mobileprovision || true
-          fi
-
           # Patch pbxproj signing settings
+          IOS_DIR="$CM_BUILD_DIR/Builds/iOS"
           PBXPROJ="$IOS_DIR/Unity-iPhone.xcodeproj/project.pbxproj"
-          # CODE_SIGN_IDENTITY: force Apple Distribution (quoted and unquoted, with optional [sdk=...])
+
+          # CODE_SIGN_IDENTITY: force Apple Distribution
           perl -i -pe 's/CODE_SIGN_IDENTITY(\[.*?\])? = "[^"]+"/CODE_SIGN_IDENTITY = "Apple Distribution"/g' "$PBXPROJ"
           perl -i -pe 's/"CODE_SIGN_IDENTITY(\[.*?\])?" = "[^"]+"/CODE_SIGN_IDENTITY = "Apple Distribution"/g' "$PBXPROJ"
-          # CODE_SIGN_STYLE: force Manual (handles both Automatic and "Automatic")
+
+          # CODE_SIGN_STYLE: force Manual (handles Automatic and "Automatic")
           perl -i -pe 's/CODE_SIGN_STYLE = "?Automatic"?;/CODE_SIGN_STYLE = Manual;/g' "$PBXPROJ"
-          # DEVELOPMENT_TEAM: set for all targets (handles any existing value)
+
+          # DEVELOPMENT_TEAM: set for all targets
           perl -i -pe 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = 47BSX989JQ;/g' "$PBXPROJ"
-          # PROVISIONING_PROFILE_SPECIFIER: delete ALL existing lines to avoid duplicates
+
+          # PROVISIONING_PROFILE_SPECIFIER: delete all existing lines to avoid duplicates
           perl -i -pe '/PROVISIONING_PROFILE_SPECIFIER/d' "$PBXPROJ"
-          # Diagnostic: show PRODUCT_BUNDLE_IDENTIFIER format in this project
+
+          # Show PRODUCT_BUNDLE_IDENTIFIER format for diagnosis
           echo "--- PRODUCT_BUNDLE_IDENTIFIER lines ---"
           grep "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ" | head -5
-          # Insert PROVISIONING_PROFILE_SPECIFIER only for the main app target (by bundle ID)
+
+          # Insert PROVISIONING_PROFILE_SPECIFIER only for the main app (matched by bundle ID)
           PROFILE_UUID_CURR=$(cat /tmp/profile_uuid.txt)
-          echo "Inserting PROVISIONING_PROFILE_SPECIFIER: $PROFILE_UUID_CURR"
+          echo "Inserting PROVISIONING_PROFILE_SPECIFIER=$PROFILE_UUID_CURR for main app..."
           perl -i -0pe "s/(PRODUCT_BUNDLE_IDENTIFIER = \"?com\\.harypary\\.tofupuyopuyo\"?;)/\$1\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID_CURR\";/g" "$PBXPROJ"
-          echo "--- PROVISIONING_PROFILE_SPECIFIER after patch ---"
-          grep "PROVISIONING_PROFILE_SPECIFIER" "$PBXPROJ" | head -5
+
+          # Verify insertion succeeded
+          SPECIFIER_COUNT=$(grep -c "PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID_CURR\"" "$PBXPROJ" 2>/dev/null || echo 0)
+          echo "PROVISIONING_PROFILE_SPECIFIER inserted $SPECIFIER_COUNT time(s)"
+          if [ "$SPECIFIER_COUNT" = "0" ]; then
+            echo "ERROR: Failed to insert PROVISIONING_PROFILE_SPECIFIER — PRODUCT_BUNDLE_IDENTIFIER format mismatch"
+            grep "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ"
+            exit 1
+          fi
+
           echo "--- CODE_SIGN_STYLE after patch ---"
           grep "CODE_SIGN_STYLE" "$PBXPROJ" | head -5
+          echo "--- PROVISIONING_PROFILE_SPECIFIER after patch ---"
+          grep "PROVISIONING_PROFILE_SPECIFIER" "$PBXPROJ" | head -5
 
-          # Generate export_options.plist using python3 (same parser as xcode-project)
+          # Generate export_options.plist
           PROFILE_UUID_VAL=$(cat /tmp/profile_uuid.txt)
-          echo "Profile UUID for plist: $PROFILE_UUID_VAL"
-          if [ -z "$PROFILE_UUID_VAL" ]; then echo "ERROR: UUID empty" && exit 1; fi
           PLIST="$CM_BUILD_DIR/export_options.plist"
           python3 -c "import plistlib,sys; d={'method':'app-store-connect','teamID':'47BSX989JQ','signingStyle':'manual','signingCertificate':'Apple Distribution','provisioningProfiles':{'com.harypary.tofupuyopuyo':sys.argv[1]}}; open(sys.argv[2],'wb').write(plistlib.dumps(d,fmt=plistlib.FMT_XML)); print('plist written')" "$PROFILE_UUID_VAL" "$PLIST"
-          echo "--- export_options.plist content ---"
-          cat "$PLIST"
-          plutil -lint "$PLIST" && echo "plist OK" || (echo "plist INVALID" && exit 1)
+          plutil -lint "$PLIST" && echo "export_options.plist OK" || (echo "export_options.plist INVALID" && exit 1)
 
       - name: Build IPA
         script: |
@@ -170,22 +175,27 @@ workflows:
           if [ -d "$IOS_DIR/Unity-iPhone.xcworkspace" ]; then
             WORKSPACE_ARG="-workspace $IOS_DIR/Unity-iPhone.xcworkspace"
           else
-            echo "xcworkspace not found, using xcodeproj"
+            echo "WARNING: xcworkspace not found, falling back to xcodeproj"
             WORKSPACE_ARG="-project $IOS_DIR/Unity-iPhone.xcodeproj"
           fi
+          echo "Using: $WORKSPACE_ARG"
 
           # Archive
           xcodebuild \
             $WORKSPACE_ARG \
             -scheme "$XCODE_SCHEME" \
             -sdk iphoneos \
+            -destination "generic/platform=iOS" \
             -configuration Release \
             -archivePath "$ARCHIVE_PATH" \
             archive \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="47BSX989JQ" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $HOME/Library/Keychains/login.keychain-db" \
             > /tmp/xcodebuild_archive.log 2>&1 \
-            || (cat /tmp/xcodebuild_archive.log && echo "Archive failed" && exit 1)
+            || (grep "error:" /tmp/xcodebuild_archive.log | tail -20 && echo "Archive failed" && exit 1)
+
+          echo "Archive succeeded"
 
           # Export IPA
           xcodebuild \
