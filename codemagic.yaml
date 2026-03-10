@@ -70,6 +70,12 @@ workflows:
           pod install --no-repo-update
           echo "Pods installed"
           ls -la
+          # Disable code signing for Pod targets to avoid provisioning profile conflicts
+          PODS_PBXPROJ="$CM_BUILD_DIR/Builds/iOS/Pods/Pods.xcodeproj/project.pbxproj"
+          if [ -f "$PODS_PBXPROJ" ]; then
+            perl -i -pe 's/CODE_SIGN_IDENTITY = "[^"]*";/CODE_SIGN_IDENTITY = "";/g' "$PODS_PBXPROJ"
+            echo "Pods signing cleared"
+          fi
 
       - name: Set up code signing
         script: |
@@ -127,6 +133,10 @@ workflows:
           PBXPROJ="$IOS_DIR/Unity-iPhone.xcodeproj/project.pbxproj"
           perl -i -pe 's/CODE_SIGN_IDENTITY(\[.*?\])? = "[^"]+"/CODE_SIGN_IDENTITY = "Apple Distribution"/g' "$PBXPROJ"
           perl -i -pe 's/"CODE_SIGN_IDENTITY(\[.*?\])?" = "[^"]+"/CODE_SIGN_IDENTITY = "Apple Distribution"/g' "$PBXPROJ"
+          # Force Manual signing for all targets (fixes UnityFramework Automatic conflict)
+          perl -i -pe 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' "$PBXPROJ"
+          # Ensure DEVELOPMENT_TEAM is set
+          perl -i -pe 's/DEVELOPMENT_TEAM = "";/DEVELOPMENT_TEAM = 47BSX989JQ;/g' "$PBXPROJ"
           echo "--- CODE_SIGN_IDENTITY after patch ---"
           grep "CODE_SIGN_IDENTITY" "$PBXPROJ" | head -10
 
@@ -165,7 +175,6 @@ workflows:
             archive \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="47BSX989JQ" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
             > /tmp/xcodebuild_archive.log 2>&1 \
             || (cat /tmp/xcodebuild_archive.log && echo "Archive failed" && exit 1)
 
