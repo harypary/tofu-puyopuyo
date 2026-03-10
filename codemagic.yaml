@@ -157,24 +157,45 @@ print('plist written to', sys.argv[2])
         script: |
           PROFILE_UUID=$(cat /tmp/profile_uuid.txt)
           IOS_DIR="$CM_BUILD_DIR/Builds/iOS"
+          ARCHIVE_PATH=/tmp/Unity-iPhone.xcarchive
+          EXPORT_PATH=/tmp/ipa
           echo "Building IPA with profile UUID: $PROFILE_UUID"
 
           if [ -d "$IOS_DIR/Unity-iPhone.xcworkspace" ]; then
-            XCODE_PATH_ARG="--workspace $IOS_DIR/Unity-iPhone.xcworkspace"
+            WORKSPACE_ARG="-workspace $IOS_DIR/Unity-iPhone.xcworkspace"
           else
             echo "xcworkspace not found, using xcodeproj"
-            XCODE_PATH_ARG="--project $IOS_DIR/Unity-iPhone.xcodeproj"
+            WORKSPACE_ARG="-project $IOS_DIR/Unity-iPhone.xcodeproj"
           fi
 
-          xcode-project build-ipa \
-            $XCODE_PATH_ARG \
-            --scheme "$XCODE_SCHEME" \
-            --export-options-plist "$CM_BUILD_DIR/export_options.plist" \
-            --archive-xcargs "CODE_SIGN_IDENTITY='Apple Distribution' PROVISIONING_PROFILE_SPECIFIER='$PROFILE_UUID'" \
-            --disable-xcpretty \
-            --log-stream stderr
+          # Archive
+          xcodebuild \
+            $WORKSPACE_ARG \
+            -scheme "$XCODE_SCHEME" \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath "$ARCHIVE_PATH" \
+            archive \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
+            > /tmp/xcodebuild_archive.log 2>&1 \
+            || (cat /tmp/xcodebuild_archive.log && echo "Archive failed" && exit 1)
+
+          # Export IPA
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_PATH" \
+            -exportOptionsPlist "$CM_BUILD_DIR/export_options.plist" \
+            > /tmp/xcodebuild_export.log 2>&1 \
+            || (cat /tmp/xcodebuild_export.log && echo "Export failed" && exit 1)
+
+          echo "--- IPA files ---"
+          ls -la "$EXPORT_PATH"
 
     artifacts:
-      - build/ios/ipa/*.ipa
+      - /tmp/ipa/*.ipa
       - /tmp/unity_build.log
       - /tmp/unity_ulc.log
+      - /tmp/xcodebuild_archive.log
+      - /tmp/xcodebuild_export.log
