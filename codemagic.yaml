@@ -135,20 +135,7 @@ workflows:
           echo "Profile UUID for plist: $PROFILE_UUID_VAL"
           if [ -z "$PROFILE_UUID_VAL" ]; then echo "ERROR: UUID empty" && exit 1; fi
           PLIST="$CM_BUILD_DIR/export_options.plist"
-          python3 -c "
-import plistlib, sys
-uuid = sys.argv[1]
-d = {
-    'method': 'app-store-connect',
-    'teamID': '47BSX989JQ',
-    'signingStyle': 'manual',
-    'signingCertificate': 'Apple Distribution',
-    'provisioningProfiles': {'com.harypary.tofupuyopuyo': uuid}
-}
-with open(sys.argv[2], 'wb') as f:
-    plistlib.dump(d, f, fmt=plistlib.FMT_XML)
-print('plist written to', sys.argv[2])
-" "$PROFILE_UUID_VAL" "$PLIST"
+          python3 -c "import plistlib,sys; d={'method':'app-store-connect','teamID':'47BSX989JQ','signingStyle':'manual','signingCertificate':'Apple Distribution','provisioningProfiles':{'com.harypary.tofupuyopuyo':sys.argv[1]}}; open(sys.argv[2],'wb').write(plistlib.dumps(d,fmt=plistlib.FMT_XML)); print('plist written')" "$PROFILE_UUID_VAL" "$PLIST"
           echo "--- export_options.plist content ---"
           cat "$PLIST"
           plutil -lint "$PLIST" && echo "plist OK" || (echo "plist INVALID" && exit 1)
