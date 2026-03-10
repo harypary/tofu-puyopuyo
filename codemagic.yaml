@@ -65,6 +65,31 @@ workflows:
           test -f "$PBXPROJ" || (echo "xcodeproj not found" && exit 1)
           echo "xcodeproj generated OK"
 
+          # Inject 1024x1024 App Store icon into Xcode asset catalog
+          ICON_SRC="$CM_BUILD_DIR/Assets/AppIcon.png"
+          APPICONSET=$(find "$CM_BUILD_DIR/Builds/iOS" -name "AppIcon.appiconset" -type d 2>/dev/null | head -1)
+          echo "AppIcon.appiconset: $APPICONSET"
+          if [ -n "$APPICONSET" ] && [ -f "$ICON_SRC" ]; then
+            cp "$ICON_SRC" "$APPICONSET/Icon-1024.png"
+            python3 -c "
+import json, os
+path = os.environ['APPICONSET'] + '/Contents.json'
+with open(path) as f: data = json.load(f)
+found = False
+for img in data['images']:
+    if img.get('idiom') == 'ios-marketing':
+        img['filename'] = 'Icon-1024.png'
+        found = True
+        break
+if not found:
+    data['images'].append({'filename': 'Icon-1024.png', 'idiom': 'ios-marketing', 'scale': '1x', 'size': '1024x1024'})
+with open(path, 'w') as f: json.dump(data, f, indent=2)
+print('App Store icon injected into asset catalog')
+" APPICONSET="$APPICONSET"
+          else
+            echo "WARNING: AppIcon.appiconset or AppIcon.png not found, skipping icon injection"
+          fi
+
       - name: Install CocoaPods dependencies
         script: |
           cd "$CM_BUILD_DIR/Builds/iOS"
