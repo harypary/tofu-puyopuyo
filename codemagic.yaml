@@ -1,7 +1,7 @@
 workflows:
   unity-ios:
     name: Unity iOS Build
-    max_build_duration: 120
+    max_build_duration: 180
     instance_type: mac_mini_m2
 
     environment:
@@ -57,7 +57,7 @@ workflows:
       - name: Install CocoaPods dependencies
         script: |
           cd "$CM_BUILD_DIR/Builds/iOS"
-          pod install
+          pod install --no-repo-update
           echo "Pods installed"
           ls -la
 
