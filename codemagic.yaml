@@ -130,11 +130,17 @@ workflows:
           PBXPROJ="$IOS_DIR/Unity-iPhone.xcodeproj/project.pbxproj"
           perl -i -pe 's/CODE_SIGN_IDENTITY(\[.*?\])? = "[^"]+"/CODE_SIGN_IDENTITY = "Apple Distribution"/g' "$PBXPROJ"
           perl -i -pe 's/"CODE_SIGN_IDENTITY(\[.*?\])?" = "[^"]+"/CODE_SIGN_IDENTITY = "Apple Distribution"/g' "$PBXPROJ"
-          # Set DEVELOPMENT_TEAM for all targets (needed for Automatic signing on UnityFramework)
+          # Force Manual signing for all targets (eliminates Automatic vs distribution cert conflict)
+          perl -i -pe 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' "$PBXPROJ"
+          # Set DEVELOPMENT_TEAM for all targets
           perl -i -pe 's/DEVELOPMENT_TEAM = [A-Z0-9"]*;/DEVELOPMENT_TEAM = 47BSX989JQ;/g' "$PBXPROJ"
-          # Set PROVISIONING_PROFILE_SPECIFIER only for the main app target (by bundle ID)
+          # Clear any existing PROVISIONING_PROFILE_SPECIFIER (frameworks don't use profiles)
+          perl -i -pe 's/PROVISIONING_PROFILE_SPECIFIER = "[^"]*";/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$PBXPROJ"
+          # Set PROVISIONING_PROFILE_SPECIFIER only for Unity-iPhone (by bundle ID, quoted or unquoted)
           PROFILE_UUID_CURR=$(cat /tmp/profile_uuid.txt)
-          perl -i -0pe "s/(PRODUCT_BUNDLE_IDENTIFIER = \"com\\.harypary\\.tofupuyopuyo\";)/\$1\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID_CURR\";/g" "$PBXPROJ"
+          perl -i -0pe "s/(PRODUCT_BUNDLE_IDENTIFIER = \"?com\\.harypary\\.tofupuyopuyo\"?;)/\$1\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID_CURR\";/g" "$PBXPROJ"
+          echo "--- PROVISIONING_PROFILE_SPECIFIER after patch ---"
+          grep "PROVISIONING_PROFILE_SPECIFIER" "$PBXPROJ" | head -10
           echo "--- CODE_SIGN_IDENTITY after patch ---"
           grep "CODE_SIGN_IDENTITY" "$PBXPROJ" | head -10
 
