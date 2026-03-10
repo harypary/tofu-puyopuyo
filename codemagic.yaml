@@ -94,12 +94,11 @@ workflows:
           # Verify — fail the build if no certificate found
           echo "--- Available signing identities ---"
           security find-identity -v -p codesigning
-          VALID=$(security find-identity -v -p codesigning | grep -c "valid identity" || true)
-          echo "Valid identity count: $VALID"
-          if [ "$VALID" = "0" ]; then
+          if ! security find-identity -v -p codesigning | grep -q "Apple Distribution\|iPhone Distribution"; then
             echo "ERROR: Certificate import failed — no valid signing identities"
             exit 1
           fi
+          echo "Certificate verified OK"
 
           # Update xcodeproj signing settings
           xcode-project use-profiles \
