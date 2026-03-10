@@ -120,34 +120,18 @@ workflows:
           echo "--- CODE_SIGN_IDENTITY after patch ---"
           grep "CODE_SIGN_IDENTITY" "$PBXPROJ" | head -10
 
-          # Generate export_options.plist manually (in case use-profiles didn't create it)
+          # Generate export_options.plist using PlistBuddy (macOS built-in)
           PROFILE_UUID_VAL=$(cat /tmp/profile_uuid.txt)
-          python3 -c "
-import sys
-uuid = sys.argv[1]
-content = '''<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">
-<dict>
-    <key>method</key>
-    <string>app-store-connect</string>
-    <key>teamID</key>
-    <string>47BSX989JQ</string>
-    <key>signingStyle</key>
-    <string>manual</string>
-    <key>signingCertificate</key>
-    <string>Apple Distribution</string>
-    <key>provisioningProfiles</key>
-    <dict>
-        <key>com.harypary.tofupuyopuyo</key>
-        <string>{uuid}</string>
-    </dict>
-</dict>
-</plist>'''.format(uuid=uuid)
-with open('/Users/builder/export_options.plist', 'w') as f:
-    f.write(content)
-" "$PROFILE_UUID_VAL"
-          echo "export_options.plist created"
+          PLIST=/Users/builder/export_options.plist
+          rm -f "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :method string app-store-connect" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :teamID string 47BSX989JQ" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :signingCertificate string 'Apple Distribution'" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.harypary.tofupuyopuyo string $PROFILE_UUID_VAL" "$PLIST"
+          echo "export_options.plist created:"
+          cat "$PLIST"
 
       - name: Build IPA
         script: |
