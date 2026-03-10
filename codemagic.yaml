@@ -4,6 +4,11 @@ workflows:
     max_build_duration: 180
     instance_type: mac_mini_m2
 
+    cache:
+      cache_paths:
+        - /Applications/Unity
+        - ~/.cocoapods
+
     environment:
       groups:
         - unity_credentials
@@ -17,17 +22,22 @@ workflows:
     scripts:
       - name: Install Unity Editor
         script: |
-          echo "Downloading Unity $UNITY_VERSION..."
-          curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorInstaller/Unity.pkg" \
-            -o /tmp/Unity.pkg
-          sudo installer -package /tmp/Unity.pkg -target /
-          echo "Downloading iOS Support..."
-          curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorTargetInstaller/UnitySetup-iOS-Support-for-Editor-$UNITY_VERSION.pkg" \
-            -o /tmp/iOSSupport.pkg
-          sudo installer -package /tmp/iOSSupport.pkg -target /
           UNITY_BIN=$(find /Applications -name "Unity" -type f 2>/dev/null | head -1)
-          echo "Unity found at: $UNITY_BIN"
-          test -n "$UNITY_BIN" && echo "Unity installed OK" || (echo "Unity NOT found" && exit 1)
+          if [ -n "$UNITY_BIN" ]; then
+            echo "Unity already installed (cached): $UNITY_BIN"
+          else
+            echo "Downloading Unity $UNITY_VERSION..."
+            curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorInstaller/Unity.pkg" \
+              -o /tmp/Unity.pkg
+            sudo installer -package /tmp/Unity.pkg -target /
+            echo "Downloading iOS Support..."
+            curl -L "https://download.unity3d.com/download_unity/$UNITY_CHANGESET/MacEditorTargetInstaller/UnitySetup-iOS-Support-for-Editor-$UNITY_VERSION.pkg" \
+              -o /tmp/iOSSupport.pkg
+            sudo installer -package /tmp/iOSSupport.pkg -target /
+            UNITY_BIN=$(find /Applications -name "Unity" -type f 2>/dev/null | head -1)
+            echo "Unity found at: $UNITY_BIN"
+            test -n "$UNITY_BIN" && echo "Unity installed OK" || (echo "Unity NOT found" && exit 1)
+          fi
 
       - name: Activate Unity License
         script: |
