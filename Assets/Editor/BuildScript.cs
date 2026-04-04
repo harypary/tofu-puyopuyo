@@ -1,4 +1,5 @@
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 using System;
@@ -10,16 +11,19 @@ public class BuildScript
         PlayerSettings.applicationIdentifier = "com.harypary.tofupuyopuyo";
         PlayerSettings.bundleVersion = "1.0";
         PlayerSettings.iOS.buildNumber = Environment.GetEnvironmentVariable("BUILD_NUMBER") ?? "1";
+        PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
 
         // Set 1024x1024 App Store icon
+        // Unity 6: NamedBuildTarget を使用（BuildTargetGroup は deprecated）
         var icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/AppIcon.png");
         if (icon != null)
         {
             var kind = UnityEditor.iOS.iOSPlatformIconKind.Application;
-            var icons = PlayerSettings.GetPlatformIcons(BuildTargetGroup.iOS, kind);
+            var namedTarget = NamedBuildTarget.iOS;
+            var icons = PlayerSettings.GetPlatformIcons(namedTarget, kind);
             for (int i = 0; i < icons.Length; i++)
                 icons[i].SetTexture(icon);
-            PlayerSettings.SetPlatformIcons(BuildTargetGroup.iOS, kind, icons);
+            PlayerSettings.SetPlatformIcons(namedTarget, kind, icons);
         }
 
         var options = new BuildPlayerOptions

@@ -17,5 +17,5 @@ MonoBehaviour:
   enableKotlinXCoroutinesPackagingOption: 1
   optimizeInitialization: 0
   optimizeAdLoading: 0
-  userTrackingUsageDescription: 
+  userTrackingUsageDescription:
   validateGradleDependencies: 0

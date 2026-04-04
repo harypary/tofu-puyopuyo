@@ -66,3 +66,6 @@ crashlytics-build.properties
 .Trashes
 ehthumbs.db
 Thumbs.db
+.env
+*.env
+run-policy-setup.js

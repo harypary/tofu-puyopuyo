@@ -51,6 +51,9 @@ public class UIManager : MonoBehaviour
     Text    modeNormalTxt;
     Text    modeHardTxt;
 
+    // タイトル（動的更新）
+    Text    titleBestText;
+
     // HUD
     GameObject hudPanel;
     Text    scoreValueText;
@@ -114,6 +117,12 @@ public class UIManager : MonoBehaviour
         titlePanel.SetActive(state   == GameState.Title);
         hudPanel.SetActive(state     == GameState.Playing);
         gameOverPanel.SetActive(state == GameState.GameOver);
+
+        if (state == GameState.Title && titleBestText != null)
+        {
+            int bsc = GameManager.Instance?.BestScore ?? PlayerPrefs.GetInt("BestScore", 0);
+            titleBestText.text = "ベストスコア  " + bsc + " 個";
+        }
 
         if (state == GameState.GameOver)
         {
@@ -277,6 +286,7 @@ public class UIManager : MonoBehaviour
         var tB = MakeText("Best", titlePanel.transform, "ベストスコア  " + bsc + " 個",
             15, ColTextMid, TextAnchor.MiddleCenter);
         AR(tB.GetComponent<RectTransform>(), new Vector2(0.1f, 0.254f), new Vector2(0.9f, 0.283f));
+        titleBestText = tB.GetComponent<Text>();
 
         // スタミナカード
         BuildStaminaCard(titlePanel.transform);

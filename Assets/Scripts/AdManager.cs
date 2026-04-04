@@ -48,9 +48,17 @@ public class AdManager : MonoBehaviour
     // ロード
     // ─────────────────────────────────
 
+    // 非パーソナライズ広告リクエスト（ポリシー準拠: npa=1）
+    static AdRequest NonPersonalizedRequest()
+    {
+        var req = new AdRequest();
+        req.Extras.Add("npa", "1");
+        return req;
+    }
+
     void LoadStaminaAd()
     {
-        RewardedAd.Load(AD_STAMINA, new AdRequest(), (ad, err) =>
+        RewardedAd.Load(AD_STAMINA, NonPersonalizedRequest(), (ad, err) =>
         {
             if (err != null)
             {
@@ -69,7 +77,7 @@ public class AdManager : MonoBehaviour
 
     void LoadRevengeAd()
     {
-        RewardedAd.Load(AD_REVENGE, new AdRequest(), (ad, err) =>
+        RewardedAd.Load(AD_REVENGE, NonPersonalizedRequest(), (ad, err) =>
         {
             if (err != null)
             {
