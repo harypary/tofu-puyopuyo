@@ -8,6 +8,9 @@ using UnityEngine.Rendering;
 /// </summary>
 public class GameBootstrap : MonoBehaviour
 {
+    // シーンリロードをまたいでテンプレートを使い回す（DontDestroyOnLoad リーク防止）
+    static GameObject s_tofuTemplate;
+
     // ─────────────────────────────────────────────────────────
     // 起動エントリポイント（シーンロード後に必ず呼ばれる）
     // ─────────────────────────────────────────────────────────
@@ -149,9 +152,13 @@ public class GameBootstrap : MonoBehaviour
 
     // ─────────────────────────────────────────────────────────
     // 豆腐テンプレート（非アクティブで保持、Spawnerが Instantiate する）
+    // シーンリロード後も同一インスタンスを再利用してメモリリークを防ぐ
     // ─────────────────────────────────────────────────────────
     static GameObject CreateTofuTemplate()
     {
+        // 既に作成済みなら再利用（RetryGame のシーンリロードで重複生成しない）
+        if (s_tofuTemplate != null) return s_tofuTemplate;
+
         var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
         go.name = "TofuPrefab";
         go.tag  = "Tofu";
@@ -172,6 +179,7 @@ public class GameBootstrap : MonoBehaviour
         // Spawner が Instantiate する前に非アクティブにしてテンプレートとして保持
         go.SetActive(false);
         Object.DontDestroyOnLoad(go);
+        s_tofuTemplate = go;
         return go;
     }
 
