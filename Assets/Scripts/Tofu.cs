@@ -122,12 +122,23 @@ public class Tofu : MonoBehaviour
             wobbleAmount = GameConfig.WobbleLand;
             isPlaced     = true;
 
+            // 衝突された豆腐にも揺れを伝播（豆腐→豆腐・豆腐→積み上がり全体がぷるん）
+            var hitTofu = col.gameObject.GetComponent<Tofu>();
+            if (hitTofu != null)
+                hitTofu.TriggerImpactWobble(GameConfig.WobbleImpact);
+
             // 着地エフェクト
             GameEffect.Instance?.PlayLandEffect(transform.position);
 
             if (GameManager.Instance?.State == GameState.Playing)
                 StartCoroutine(NotifyWhenSettled());
         }
+    }
+
+    /// <summary>他の豆腐が乗ってきたときに呼ばれる。置かれた状態でもぷるんと揺れる。</summary>
+    public void TriggerImpactWobble(float amount)
+    {
+        wobbleAmount = Mathf.Max(wobbleAmount, amount);
     }
 
     // 物理的に静止してから次の豆腐をスポーンする
