@@ -147,6 +147,7 @@ public class Spawner : MonoBehaviour
         if (shadowObject != null) shadowObject.SetActive(false);
 
         currentTofu = Instantiate(tofuPrefab, transform.position, Quaternion.identity);
+        if (!currentTofu.activeSelf) currentTofu.SetActive(true); // テンプレートが非アクティブでも確実に有効化
         currentTofu.transform.SetParent(transform);
         isMoving = true;
 
