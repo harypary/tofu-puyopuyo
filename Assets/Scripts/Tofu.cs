@@ -74,7 +74,7 @@ public class Tofu : MonoBehaviour
 
         if (wobbleAmount > 0.001f)
         {
-            currentWobble = Mathf.Sin(Time.time * 15f) * wobbleAmount;
+            currentWobble = Mathf.Sin(Time.time * GameConfig.WobbleFrequency) * wobbleAmount;
             wobbleAmount  = Mathf.Lerp(wobbleAmount, 0, Time.deltaTime * GameConfig.WobbleDecayRate);
         }
         else

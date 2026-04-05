@@ -11,10 +11,11 @@ public static class GameConfig
     public const float SpawnHeight  = 6.0f;   // 豆腐の出現 Y 座標
 
     // ===== 豆腐の揺れ =====
-    public const float WobbleLand      = 0.7f;   // 着地時の揺れ量（大きいほどぶよぶよ）
-    public const float WobbleDrop      = 0.6f;   // ドロップ時の揺れ量
-    public const float WobbleDecayRate = 3f;     // 揺れの減衰速度（小さいほど長く揺れる）
-    public const float WobbleIdleAmp   = 0.08f;  // 空中待機中の微振動量
+    public const float WobbleLand      = 0.95f;  // 着地時の揺れ量（大きいほどぶよぶよ）
+    public const float WobbleDrop      = 0.85f;  // ドロップ時の揺れ量
+    public const float WobbleDecayRate = 1.5f;   // 揺れの減衰速度（小さいほど長く揺れる）
+    public const float WobbleFrequency = 10f;    // 揺れの振動周波数（低いほどゆっくり揺れる）
+    public const float WobbleIdleAmp   = 0.15f;  // 空中待機中の微振動量
     public const float WobbleIdleFreq  = 12f;    // 空中待機中の微振動周波数
 
     // ===== スタミナ =====

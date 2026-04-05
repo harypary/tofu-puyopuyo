@@ -99,42 +99,47 @@ public class AdManager : MonoBehaviour
     // 公開 API
     // ─────────────────────────────────
 
-    /// <summary>スタミナ回復広告を表示。報酬付与時に onRewarded を呼ぶ</summary>
-    public void ShowStaminaAd(Action onRewarded)
+    /// <summary>
+    /// スタミナ回復広告を表示。onComplete(adShown) を呼ぶ。
+    /// adShown=true: 広告が実際に表示された / false: 広告なし（無料付与）
+    /// </summary>
+    public void ShowStaminaAd(Action<bool> onComplete)
     {
 #if ADMOB_ENABLED
         if (staminaAd != null && staminaAd.CanShowAd())
         {
-            staminaAd.Show(_ => onRewarded?.Invoke());
+            staminaAd.Show(_ => onComplete?.Invoke(true));
         }
         else
         {
             Debug.Log("[Ad] スタミナ広告未準備 — フォールバック付与");
             LoadStaminaAd();
-            onRewarded?.Invoke();
+            onComplete?.Invoke(false);
         }
 #else
-        // SDK 未導入時はそのまま報酬付与
-        onRewarded?.Invoke();
+        onComplete?.Invoke(false);
 #endif
     }
 
-    /// <summary>リベンジ広告を表示。報酬付与時に onRewarded を呼ぶ</summary>
-    public void ShowRevengeAd(Action onRewarded)
+    /// <summary>
+    /// リベンジ広告を表示。onComplete(adShown) を呼ぶ。
+    /// adShown=true: 広告が実際に表示された / false: 広告なし（無料付与）
+    /// </summary>
+    public void ShowRevengeAd(Action<bool> onComplete)
     {
 #if ADMOB_ENABLED
         if (revengeAd != null && revengeAd.CanShowAd())
         {
-            revengeAd.Show(_ => onRewarded?.Invoke());
+            revengeAd.Show(_ => onComplete?.Invoke(true));
         }
         else
         {
             Debug.Log("[Ad] リベンジ広告未準備 — フォールバック付与");
             LoadRevengeAd();
-            onRewarded?.Invoke();
+            onComplete?.Invoke(false);
         }
 #else
-        onRewarded?.Invoke();
+        onComplete?.Invoke(false);
 #endif
     }
 }

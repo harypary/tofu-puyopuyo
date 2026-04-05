@@ -399,10 +399,12 @@ public class UIManager : MonoBehaviour
         adRt.anchoredPosition = new Vector2(0, 5);
         adBtn.onClick.AddListener(() =>
         {
-            AdManager.Instance?.ShowStaminaAd(() =>
+            AdManager.Instance?.ShowStaminaAd(adShown =>
             {
                 StaminaManager.Instance?.RecoverFull();
                 UpdateStamina();
+                if (!adShown)
+                    ShowToast("広告が現在利用できません。\nスタミナを全回復しました！");
             });
         });
     }
@@ -511,10 +513,12 @@ public class UIManager : MonoBehaviour
         Shadow(goAdBtn.gameObject, new Color(0.3f, 0.15f, 0f, 0.35f), new Vector2(0, -2));
         goAdBtn.onClick.AddListener(() =>
         {
-            AdManager.Instance?.ShowRevengeAd(() =>
+            AdManager.Instance?.ShowRevengeAd(adShown =>
             {
                 goAdBtn.gameObject.SetActive(false);
                 GameManager.Instance?.ContinueGame();
+                if (!adShown)
+                    ShowToast("広告が現在利用できません。\n無料で続きからプレイします！");
             });
         });
 
@@ -531,9 +535,38 @@ public class UIManager : MonoBehaviour
         var toTitle = MakeButton("ToT", card, "タイトルへ", 16,
             new Color(0.82f, 0.76f, 0.68f, 1f), new Color(0.65f, 0.58f, 0.50f, 1f), ColTextDark,
             new Vector2(0.5f, 0.042f), new Vector2(152, 42));
-        toTitle.onClick.AddListener(() => GameManager.Instance?.RetryGame());
+        toTitle.onClick.AddListener(() => GameManager.Instance?.ReturnToTitle());
 
         gameOverPanel.SetActive(false);
+    }
+
+    // ===== Toast =====
+
+    /// <summary>画面中央下部に一時メッセージを表示する（広告なし通知など）</summary>
+    public void ShowToast(string message, float duration = 2.8f)
+    {
+        if (canvas == null) return;
+
+        var go = new GameObject("Toast");
+        go.transform.SetParent(canvas.transform, false);
+        go.transform.SetAsLastSibling(); // 最前面に表示
+
+        var rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.18f);
+        rt.pivot     = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(310, 64);
+        rt.anchoredPosition = Vector2.zero;
+
+        var bg = go.AddComponent<Image>();
+        bg.color = new Color(0.10f, 0.08f, 0.06f, 0.88f);
+
+        var txt = MakeText("TT", go.transform, message, 14, Color.white, TextAnchor.MiddleCenter);
+        txt.horizontalOverflow = HorizontalWrapMode.Wrap;
+        Stretch(txt.GetComponent<RectTransform>());
+        txt.GetComponent<RectTransform>().offsetMin = new Vector2(10, 6);
+        txt.GetComponent<RectTransform>().offsetMax = new Vector2(-10, -6);
+
+        Destroy(go, duration);
     }
 
     // ===== Helpers =====
@@ -541,7 +574,11 @@ public class UIManager : MonoBehaviour
     float SafeTop()
     {
 #if UNITY_IOS
-        return Mathf.Max(0f, Screen.height - Screen.safeArea.height - Screen.safeArea.y);
+        // Screen.safeArea は物理ピクセル単位。Canvas reference (390×844) に変換する。
+        // MatchWidthOrHeight=0 (width only) なので scaleFactor = Screen.width / 390
+        float px = Mathf.Max(0f, Screen.height - Screen.safeArea.height - Screen.safeArea.y);
+        float scaleFactor = Mathf.Max(1f, Screen.width / 390f);
+        return px / scaleFactor;
 #else
         return 0f;
 #endif
