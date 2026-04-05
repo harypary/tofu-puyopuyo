@@ -159,20 +159,28 @@ public class GameBootstrap : MonoBehaviour
         // 既に作成済みなら再利用（RetryGame のシーンリロードで重複生成しない）
         if (s_tofuTemplate != null) return s_tofuTemplate;
 
-        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        go.name = "TofuPrefab";
-        go.tag  = "Tofu";
+        // ルート: 物理専用（BoxCollider はスケール変形しない → 跳ね影響なし）
+        var go = new GameObject("TofuPrefab");
+        go.tag = "Tofu";
         go.transform.localScale = new Vector3(1.5f, 0.8f, 1.5f);
-
-        var mr = go.GetComponent<MeshRenderer>();
-        mr.shadowCastingMode = ShadowCastingMode.Off;
-        mr.receiveShadows    = false;
-        ApplyColor(go, Color.white);
+        go.AddComponent<BoxCollider>(); // local size (1,1,1) → world (1.5, 0.8, 1.5)
 
         var rb = go.AddComponent<Rigidbody>();
         rb.isKinematic            = true;
         rb.useGravity             = false;
         rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+
+        // 子: 見た目のみ（wobble スケールをここに適用、物理には影響しない）
+        var visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        visual.name = "Visual";
+        visual.transform.SetParent(go.transform, false);
+        visual.transform.localScale = Vector3.one;
+        Object.Destroy(visual.GetComponent<BoxCollider>());
+
+        var mr = visual.GetComponent<MeshRenderer>();
+        mr.shadowCastingMode = ShadowCastingMode.Off;
+        mr.receiveShadows    = false;
+        ApplyColor(visual, Color.white);
 
         go.AddComponent<Tofu>();
 

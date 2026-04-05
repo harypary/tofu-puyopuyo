@@ -7,6 +7,7 @@ public class Tofu : MonoBehaviour
     private bool isPlaced = false;
     public bool IsPlaced => isPlaced;
 
+    private Transform visualTransform; // 見た目の子オブジェクト（物理と分離）
     private Vector3 originalScale;
     private float wobbleAmount = 0f;
     private float constantWobble = 0f;
@@ -19,7 +20,9 @@ public class Tofu : MonoBehaviour
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
-        originalScale = transform.localScale;
+        // "Visual" 子があればそちらを使う（なければ自分自身にフォールバック）
+        visualTransform = transform.Find("Visual") ?? transform;
+        originalScale   = visualTransform.localScale;
 
         if (rb != null)
         {
@@ -49,7 +52,7 @@ public class Tofu : MonoBehaviour
                 }
             }
         }
-        var mr = GetComponent<MeshRenderer>();
+        var mr = visualTransform.GetComponent<MeshRenderer>();
         if (mr != null && s_mat != null) mr.sharedMaterial = s_mat;
 
         // 物理マテリアル：跳ねをゼロに
@@ -84,7 +87,8 @@ public class Tofu : MonoBehaviour
                 currentWobble = constantWobble;
         }
 
-        transform.localScale = originalScale + new Vector3(currentWobble, -currentWobble, currentWobble);
+        // 視覚のみスケール変形（コライダーは親のまま → 物理的な跳ね影響ゼロ）
+        visualTransform.localScale = originalScale + new Vector3(currentWobble, -currentWobble, currentWobble);
 
         // 画面外（下に落ちた）= ゲームオーバー（Playingのときのみ）
         if (transform.position.y < -5f && GameManager.Instance?.State == GameState.Playing)
