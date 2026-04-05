@@ -10,8 +10,11 @@ public class GameManager : MonoBehaviour
     public Spawner spawner;
     public bool isEasyMode = true; // true=ノーマル(回転なし), false=ハード(回転あり)
 
-    private int score     = 0;
-    private int bestScore = 0;
+    private int score        = 0;
+    private int bestScore    = 0;
+    private int continueCount = 0;          // 広告リベンジ使用回数
+    public const int MaxContinues = 2;      // 1ゲームあたりの最大リベンジ回数
+    public bool CanContinue => continueCount < MaxContinues;
     private GameState gameState = GameState.Title;
 
     public GameState State     => gameState;
@@ -52,6 +55,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
+        continueCount = 0;
         score = 0;
         UIManager.Instance?.UpdateScore(0);
         if (spawner != null)
@@ -107,8 +111,10 @@ public class GameManager : MonoBehaviour
         }
 
         if (spawner != null) spawner.gameObject.SetActive(false);
-        foreach (var t in FindObjectsByType<Tofu>(FindObjectsSortMode.None))
+        // 非アクティブ含む全豆腐を削除（Spawner子の非アクティブ豆腐も確実に削除）
+        foreach (var t in FindObjectsByType<Tofu>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             Destroy(t.gameObject);
+        continueCount = 0;
         score = 0;
         UIManager.Instance?.UpdateScore(0);
         if (spawner != null) spawner.gameObject.SetActive(true);
@@ -119,6 +125,12 @@ public class GameManager : MonoBehaviour
     public void ContinueGame()
     {
         if (gameState != GameState.GameOver) return;
+        continueCount++;
+
+        // 画面外に落ちた豆腐を削除（残ったままだと次フレームで即 GameOver が再トリガーされる）
+        foreach (var t in FindObjectsByType<Tofu>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            if (t.transform.position.y < -2f) Destroy(t.gameObject);
+
         if (spawner != null) spawner.gameObject.SetActive(true);
         SetState(GameState.Playing);
     }
@@ -127,9 +139,10 @@ public class GameManager : MonoBehaviour
     public void ReturnToTitle()
     {
         if (spawner != null) spawner.gameObject.SetActive(false);
-        // 積まれた豆腐を全て削除
-        foreach (var t in FindObjectsByType<Tofu>(FindObjectsSortMode.None))
+        // 積まれた豆腐を全て削除（非アクティブも含む）
+        foreach (var t in FindObjectsByType<Tofu>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             Destroy(t.gameObject);
+        continueCount = 0;
         score = 0;
         SetState(GameState.Title);
     }

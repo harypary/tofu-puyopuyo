@@ -130,7 +130,9 @@ public class UIManager : MonoBehaviour
             int bsc = GameManager.Instance?.BestScore  ?? 0;
             if (goScoreText != null) goScoreText.text = sc  + " 個";
             if (goBestText  != null) goBestText.text  = "ベスト  " + bsc + " 個";
-            if (goAdBtn != null) goAdBtn.gameObject.SetActive(true);
+            // リベンジ広告ボタン：残り回数がある場合のみ表示（最大 GameManager.MaxContinues 回）
+            bool canContinue = GameManager.Instance?.CanContinue ?? true;
+            if (goAdBtn != null) goAdBtn.gameObject.SetActive(canContinue);
 
             // スタミナに応じてリトライボタンの表示を切り替え
             bool hasStamina = StaminaManager.Instance == null || StaminaManager.Instance.Current > 0;
@@ -513,12 +515,14 @@ public class UIManager : MonoBehaviour
         Shadow(goAdBtn.gameObject, new Color(0.3f, 0.15f, 0f, 0.35f), new Vector2(0, -2));
         goAdBtn.onClick.AddListener(() =>
         {
+            // 二重押し防止
+            goAdBtn.interactable = false;
             AdManager.Instance?.ShowRevengeAd(adShown =>
             {
-                goAdBtn.gameObject.SetActive(false);
-                GameManager.Instance?.ContinueGame();
+                goAdBtn.interactable = true;
                 if (!adShown)
                     ShowToast("広告が現在利用できません。\n無料で続きからプレイします！");
+                GameManager.Instance?.ContinueGame(); // continueCount++ & 落下豆腐削除 & 再開
             });
         });
 

@@ -143,6 +143,11 @@ public class Spawner : MonoBehaviour
     {
         if (tofuPrefab == null) return;
 
+        // GameOver で Spawner が非アクティブになった際に子として残った豆腐を削除
+        // （再有効化時に蘇って余分な豆腐が出るバグを防ぐ）
+        foreach (Transform child in transform)
+            Destroy(child.gameObject);
+
         droppedTofu = null;
         if (shadowObject != null) shadowObject.SetActive(false);
 
