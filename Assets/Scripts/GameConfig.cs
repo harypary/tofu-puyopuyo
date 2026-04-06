@@ -27,6 +27,11 @@ public static class GameConfig
     public const float CamFOV = 60f;
     // カメラ位置・角度は AutoSetupTofuGame.cs で設定（pos: 0,8,-15 / rot: 15,0,0）
 
+    // ===== スポーナー・カメラ高さ追従 =====
+    public const float SpawnClearance  = 3.0f;  // 積み上げ豆腐 top から何m 空けてスポーンするか
+    public const float CamAboveSpawn   = 2.0f;  // スポーナー Y からカメラ Y までのオフセット（cam=8, spawn=6 → 差=2）
+    public const float CamFollowSpeed  = 2.0f;  // カメラが上昇目標に追従する速さ
+
     // ===== 物理 =====
     // 地面: Cube pos(0,-1,0) scale(10,1,10)
     // スポーン pos: (0, SpawnHeight, 0)

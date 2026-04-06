@@ -4,13 +4,11 @@ using UnityEngine.Rendering;
 /// <summary>
 /// ランタイム自動セットアップ。
 /// シーンに何も置かなくてもゲームが動くようにする。
-/// TofuGame > Setup Scene の代替（ビルド環境向け）。
+/// 豆腐は Spawner.CreateNewTofu() が毎回直接生成するため
+/// DontDestroyOnLoad テンプレートは不要（削除済み）。
 /// </summary>
 public class GameBootstrap : MonoBehaviour
 {
-    // シーンリロードをまたいでテンプレートを使い回す（DontDestroyOnLoad リーク防止）
-    static GameObject s_tofuTemplate;
-
     // ─────────────────────────────────────────────────────────
     // 起動エントリポイント（シーンロード後に必ず呼ばれる）
     // ─────────────────────────────────────────────────────────
@@ -27,8 +25,7 @@ public class GameBootstrap : MonoBehaviour
         CreateBackground();
         CreateGround();
 
-        var tofuTemplate = CreateTofuTemplate();
-        var shadow       = CreateShadow();
+        var shadow = CreateShadow();
 
         // GameManager
         var gm = new GameObject("GameManager").AddComponent<GameManager>();
@@ -50,9 +47,11 @@ public class GameBootstrap : MonoBehaviour
         // 広告
         new GameObject("AdManager").AddComponent<AdManager>();
 
-        // リンク
-        gm.spawner          = spawner;
-        spawner.tofuPrefab   = tofuTemplate;
+        // デバッグオーバーレイ（原因特定後に削除）
+        new GameObject("DebugOverlay").AddComponent<DebugOverlay>();
+
+        // リンク（tofuPrefab は不要。Spawner が直接生成する）
+        gm.spawner           = spawner;
         spawner.shadowObject = shadow;
 
         Debug.Log("[Bootstrap] セットアップ完了！");
@@ -148,47 +147,6 @@ public class GameBootstrap : MonoBehaviour
         ground.transform.position   = new Vector3(0f, -1f, 0f);
         ground.transform.localScale = new Vector3(7f, 1f, 7f);
         ApplyColor(ground, new Color(0.3f, 0.4f, 0.3f, 1f));
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // 豆腐テンプレート（非アクティブで保持、Spawnerが Instantiate する）
-    // シーンリロード後も同一インスタンスを再利用してメモリリークを防ぐ
-    // ─────────────────────────────────────────────────────────
-    static GameObject CreateTofuTemplate()
-    {
-        // 既に作成済みなら再利用（RetryGame のシーンリロードで重複生成しない）
-        if (s_tofuTemplate != null) return s_tofuTemplate;
-
-        // ルート: 物理専用（BoxCollider はスケール変形しない → 跳ね影響なし）
-        var go = new GameObject("TofuPrefab");
-        go.tag = "Tofu";
-        go.transform.localScale = new Vector3(1.5f, 0.8f, 1.5f);
-        go.AddComponent<BoxCollider>(); // local size (1,1,1) → world (1.5, 0.8, 1.5)
-
-        var rb = go.AddComponent<Rigidbody>();
-        rb.isKinematic            = true;
-        rb.useGravity             = false;
-        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
-
-        // 子: 見た目のみ（wobble スケールをここに適用、物理には影響しない）
-        var visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        visual.name = "Visual";
-        visual.transform.SetParent(go.transform, false);
-        visual.transform.localScale = Vector3.one;
-        Object.Destroy(visual.GetComponent<BoxCollider>());
-
-        var mr = visual.GetComponent<MeshRenderer>();
-        mr.shadowCastingMode = ShadowCastingMode.Off;
-        mr.receiveShadows    = false;
-        ApplyColor(visual, Color.white);
-
-        go.AddComponent<Tofu>();
-
-        // Spawner が Instantiate する前に非アクティブにしてテンプレートとして保持
-        go.SetActive(false);
-        Object.DontDestroyOnLoad(go);
-        s_tofuTemplate = go;
-        return go;
     }
 
     // ─────────────────────────────────────────────────────────

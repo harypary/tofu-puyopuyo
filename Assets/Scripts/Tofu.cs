@@ -30,16 +30,24 @@ public class Tofu : MonoBehaviour
             rb.useGravity  = false;
         }
 
-        // 実行時にシェーダーを取得して確実に白く塗る（エディタのシェーダー問題を回避）
+        // 実行時にシェーダーを取得して確実に白く塗る
+        // iOS では Resources.UnloadUnusedAssets() 等でランタイム生成マテリアルが
+        // ネイティブ側で解放されることがある。Unity の == は破棄済みを null 扱いするため
+        // このチェックで再生成できる。Always Included Shaders に URP シェーダーを追加済み。
         if (s_mat == null)
         {
             // Simple Lit は灰色になりにくい軽量シェーダー
             Shader sh = Shader.Find("Universal Render Pipeline/Simple Lit")
                      ?? Shader.Find("Universal Render Pipeline/Lit")
-                     ?? Shader.Find("Standard");
+                     ?? Shader.Find("Standard")
+                     ?? Shader.Find("Sprites/Default"); // Always Included Shaders に確実に含まれる最終フォールバック
             if (sh != null)
             {
                 s_mat = new Material(sh) { name = "TofuWhite" };
+                // DontUnloadUnusedAsset: Resources.UnloadUnusedAssets() や
+                // Unity ネイティブ GC によるランタイム生成マテリアルの解放を防ぐ。
+                // これがないと s_mat が2回目のゲームで null になり豆腐が透明になる。
+                s_mat.hideFlags = HideFlags.DontUnloadUnusedAsset;
                 if (s_mat.HasProperty("_BaseColor"))    s_mat.SetColor("_BaseColor", Color.white);
                 if (s_mat.HasProperty("_Color"))        s_mat.color = Color.white;
                 if (s_mat.HasProperty("_Smoothness"))   s_mat.SetFloat("_Smoothness", 0.1f);
@@ -66,6 +74,7 @@ public class Tofu : MonoBehaviour
                 bounceCombine    = PhysicsMaterialCombine.Minimum,
                 frictionCombine  = PhysicsMaterialCombine.Average
             };
+            s_pm.hideFlags = HideFlags.DontUnloadUnusedAsset;
         }
         var col = GetComponent<Collider>();
         if (col != null) col.sharedMaterial = s_pm;

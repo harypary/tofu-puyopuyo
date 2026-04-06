@@ -401,8 +401,10 @@ public class UIManager : MonoBehaviour
         adRt.anchoredPosition = new Vector2(0, 5);
         adBtn.onClick.AddListener(() =>
         {
+            adBtn.interactable = false;
             AdManager.Instance?.ShowStaminaAd(adShown =>
             {
+                adBtn.interactable = true;
                 StaminaManager.Instance?.RecoverFull();
                 UpdateStamina();
                 if (!adShown)

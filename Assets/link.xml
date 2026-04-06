@@ -1,0 +1,5 @@
+<linker>
+  <!-- ゲーム本体コードをすべて保持（IL2CPP のコードストリッピング対策） -->
+  <assembly fullname="Assembly-CSharp" preserve="all"/>
+  <assembly fullname="Assembly-CSharp-firstpass" preserve="all"/>
+</linker>

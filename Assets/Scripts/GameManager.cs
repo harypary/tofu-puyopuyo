@@ -52,14 +52,21 @@ public class GameManager : MonoBehaviour
         if (StaminaManager.Instance != null && !StaminaManager.Instance.UseStamina())
         {
             Debug.Log("[Game] スタミナ不足 — ゲーム開始できません");
+            DebugOverlay.AddEvent("StartGame: スタミナ不足");
             return;
         }
 
+        DebugOverlay.AddEvent("StartGame");
         continueCount = 0;
         score = 0;
         UIManager.Instance?.UpdateScore(0);
+        ResetSpawnerAndCamera();
         if (spawner != null)
+        {
             spawner.gameObject.SetActive(true);
+            spawner.SpawnNewTofu(); // OnEnable に依存せず必ず呼ぶ
+            DebugOverlay.AddEvent($"StartGame: SpawnNewTofu done cur={spawner.HasCurrentTofu}");
+        }
         SetState(GameState.Playing);
     }
 
@@ -68,12 +75,26 @@ public class GameManager : MonoBehaviour
         if (gameState != GameState.Playing || spawner == null) return;
         score++;
         UIManager.Instance?.UpdateScore(score);
+        DebugOverlay.AddEvent($"OnTofuPlaced score={score}");
+
+        // 積み上げた豆腐の最高点がスポーナーに近づいたら上昇させる
+        float stackTop = tofu.transform.position.y + 0.5f; // 豆腐の高さの半分を加算
+        float spawnY   = spawner.transform.position.y;
+        if (stackTop > spawnY - GameConfig.SpawnClearance)
+        {
+            float newSpawnY = stackTop + GameConfig.SpawnClearance;
+            spawner.MoveUp(newSpawnY);
+            GameEffect.Instance?.SetCameraTargetY(newSpawnY + GameConfig.CamAboveSpawn);
+        }
+
         spawner.SpawnNewTofu();
+        DebugOverlay.AddEvent($"OnTofuPlaced: SpawnNewTofu done cur={spawner.HasCurrentTofu}");
     }
 
     public void GameOver()
     {
         if (gameState != GameState.Playing) return;
+        DebugOverlay.AddEvent($"GameOver score={score}");
 
         if (score > bestScore)
         {
@@ -107,17 +128,24 @@ public class GameManager : MonoBehaviour
         if (StaminaManager.Instance != null && !StaminaManager.Instance.UseStamina())
         {
             Debug.Log("[Game] スタミナ不足 — リスタートできません");
+            DebugOverlay.AddEvent("QuickRestart: スタミナ不足");
             return;
         }
 
+        DebugOverlay.AddEvent("QuickRestart");
         if (spawner != null) spawner.gameObject.SetActive(false);
-        // 非アクティブ含む全豆腐を削除（Spawner子の非アクティブ豆腐も確実に削除）
-        foreach (var t in FindObjectsByType<Tofu>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-            Destroy(t.gameObject);
+        // アクティブな豆腐のみ削除。FindGameObjectsWithTag はアクティブ限定のため
+        // 非アクティブ（DDOL テンプレート / スポーナー無効時の子）は返らず安全。
+        DestroyActiveTofus(minY: float.NegativeInfinity);
         continueCount = 0;
         score = 0;
         UIManager.Instance?.UpdateScore(0);
-        if (spawner != null) spawner.gameObject.SetActive(true);
+        ResetSpawnerAndCamera();
+        if (spawner != null)
+        {
+            spawner.gameObject.SetActive(true);
+            spawner.SpawnNewTofu(); // OnEnable に依存せず必ず呼ぶ
+        }
         SetState(GameState.Playing);
     }
 
@@ -127,23 +155,73 @@ public class GameManager : MonoBehaviour
         if (gameState != GameState.GameOver) return;
         continueCount++;
 
-        // 画面外に落ちた豆腐を削除（残ったままだと次フレームで即 GameOver が再トリガーされる）
-        foreach (var t in FindObjectsByType<Tofu>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-            if (t.transform.position.y < -2f) Destroy(t.gameObject);
+        // 落下した豆腐（y < -2）のみ削除。テンプレートは非アクティブなので対象外。
+        DestroyActiveTofus(minY: float.NegativeInfinity, maxY: -2f);
 
-        if (spawner != null) spawner.gameObject.SetActive(true);
+        if (spawner != null)
+        {
+            spawner.gameObject.SetActive(true);
+            spawner.SpawnNewTofu(); // OnEnable に依存せず必ず呼ぶ
+        }
         SetState(GameState.Playing);
     }
 
     /// <summary>プレイ中にタイトルへ戻る</summary>
     public void ReturnToTitle()
     {
+        DebugOverlay.AddEvent("ReturnToTitle");
         if (spawner != null) spawner.gameObject.SetActive(false);
-        // 積まれた豆腐を全て削除（非アクティブも含む）
-        foreach (var t in FindObjectsByType<Tofu>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-            Destroy(t.gameObject);
+        // 豆腐は spawner の子にしていないため SetActive(false) の影響を受けない。
+        // FindGameObjectsWithTag でアクティブ豆腐を全削除できる。
+        DestroyActiveTofus(minY: float.NegativeInfinity);
         continueCount = 0;
         score = 0;
+        ResetSpawnerAndCamera();
         SetState(GameState.Title);
+    }
+
+    /// <summary>
+    /// "Tofu" タグのアクティブな GameObject を削除する。
+    /// 豆腐は spawner の子にしていないので spawner の SetActive に関係なく常にアクティブ。
+    /// FindGameObjectsWithTag で確実に全豆腐を検出できる。
+    /// maxY を指定するとその Y 座標より低いものだけ削除（ContinueGame 用）。
+    /// </summary>
+    void DestroyActiveTofus(float minY = float.NegativeInfinity, float maxY = float.PositiveInfinity)
+    {
+        foreach (var go in GameObject.FindGameObjectsWithTag("Tofu"))
+        {
+            if (go.transform.position.y >= minY && go.transform.position.y <= maxY)
+            {
+                // SetActive(false) を先に呼ぶことで、Destroy() が遅延実行されるまでの間に
+                // Tofu.Update() が GameOver() を誤発動するのを同フレーム内で防ぐ
+                go.SetActive(false);
+                Destroy(go);
+            }
+        }
+    }
+
+    /// <summary>
+    /// iOS でアプリがバックグラウンドから復帰したとき（ホームボタン → 再起動）に呼ばれる。
+    /// Playing 状態なのに豆腐がない場合は再スポーンして正常に戻す。
+    /// </summary>
+    void OnApplicationFocus(bool hasFocus)
+    {
+        if (!hasFocus) return; // フォーカスを失った時は何もしない
+        if (gameState != GameState.Playing) return;
+        if (spawner == null) return;
+        if (!spawner.HasTofu)
+        {
+            Debug.Log("[GameManager] OnApplicationFocus: Playing 中に tofu なし → 再スポーン");
+            spawner.SpawnNewTofu();
+        }
+    }
+
+    void ResetSpawnerAndCamera()
+    {
+        if (spawner != null)
+            spawner.transform.position = new Vector3(
+                spawner.transform.position.x, GameConfig.SpawnHeight,
+                spawner.transform.position.z);
+        GameEffect.Instance?.ResetCamera();
     }
 }

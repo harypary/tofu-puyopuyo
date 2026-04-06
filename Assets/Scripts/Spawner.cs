@@ -1,11 +1,13 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
 
 public class Spawner : MonoBehaviour
 {
-    public GameObject tofuPrefab;
+    // tofuPrefab は不使用（SpawnNewTofu が毎回直接生成するため）
+    [HideInInspector] public GameObject tofuPrefab;
     public GameObject shadowObject;
     // moveSpeed / moveRange は GameConfig から直接読む（serialized 値に依存しない）
 
@@ -15,6 +17,23 @@ public class Spawner : MonoBehaviour
     private float dropCooldown = 0f;   // 起動直後の誤タップ防止
     private float randomOffsetX;
     private float randomOffsetZ;
+
+    // 安全網: Playing 中に豆腐が存在しない時間が続いた場合に強制スポーンするタイマー
+    private float noTofuTimer = 0f;
+    private const float NoTofuTimeout = 4f; // NotifyWhenSettled の最大待機(3.4s)より長く設定
+
+    /// <summary>
+    /// 浮遊中 or 落下・着地待ち中の豆腐が存在するか。
+    /// currentTofu（浮遊中）だけでなく droppedTofu（落下〜NotifyWhenSettled 完了まで）も含める。
+    /// ドロップ後 〜 着地完了の間も HasTofu=true になるため OnApplicationFocus の誤スポーンを防ぐ。
+    /// </summary>
+    public bool HasTofu         => currentTofu != null || droppedTofu != null;
+
+    // デバッグオーバーレイ用
+    public bool  IsMovingDebug      => isMoving;
+    public bool  HasCurrentTofu     => currentTofu != null;
+    public bool  HasDroppedTofu     => droppedTofu != null;
+    public float NoTofuTimerDebug   => noTofuTimer;
 
     void Start()
     {
@@ -65,7 +84,7 @@ public class Spawner : MonoBehaviour
     void OnEnable()
     {
         dropCooldown = GameConfig.DropCooldown;
-        SpawnNewTofu();
+        // SpawnNewTofu は GameManager から明示的に呼ばれる（OnEnable 依存を排除）
     }
 
     void OnDisable()
@@ -75,10 +94,25 @@ public class Spawner : MonoBehaviour
 
     void Update()
     {
-        if (GameManager.Instance?.State != GameState.Playing) return;
+        if (GameManager.Instance?.State != GameState.Playing)
+        {
+            noTofuTimer = 0f; // Playing 以外ではタイマーをリセット
+            return;
+        }
+
+        // 安全網①: isMoving=true なのに currentTofu が消えていたら緊急再スポーン
+        // iOS など予期しないタイミングで tofu が失われた場合に自動復旧する
+        if (isMoving && currentTofu == null)
+        {
+            Debug.LogWarning("[Spawner] currentTofu が null です。緊急再スポーン。");
+            SpawnNewTofu();
+            return;
+        }
 
         if (isMoving && currentTofu != null)
         {
+            noTofuTimer = 0f; // 浮遊豆腐あり → タイマーリセット
+
             float xPos = (Mathf.PerlinNoise(Time.time * GameConfig.MoveSpeed + randomOffsetX, 0) * 2f - 1f) * GameConfig.MoveRange;
             float zPos = (Mathf.PerlinNoise(0, Time.time * GameConfig.MoveSpeed + randomOffsetZ) * 2f - 1f) * GameConfig.MoveRange;
             float curY = transform.position.y;
@@ -95,6 +129,8 @@ public class Spawner : MonoBehaviour
         }
         else if (!isMoving && droppedTofu != null)
         {
+            noTofuTimer = 0f; // 落下中の豆腐を追跡中 → タイマーリセット
+
             // 着地済みなら追跡終了
             Tofu t = droppedTofu.GetComponent<Tofu>();
             if (t != null && t.IsPlaced)
@@ -105,6 +141,19 @@ public class Spawner : MonoBehaviour
             else
             {
                 UpdateShadow(droppedTofu.transform.position);
+            }
+        }
+        else
+        {
+            // !isMoving && droppedTofu == null && currentTofu == null
+            // = NotifyWhenSettled() の完了を待っている状態
+            // 安全網②: この状態が NoTofuTimeout 秒以上続いたら強制スポーン
+            // （NotifyWhenSettled が iOS で完了しなかったケースをカバー）
+            noTofuTimer += Time.deltaTime;
+            if (noTofuTimer >= NoTofuTimeout)
+            {
+                Debug.LogWarning("[Spawner] 豆腐なし " + NoTofuTimeout + "秒超過 → 強制スポーン");
+                SpawnNewTofu();
             }
         }
     }
@@ -141,26 +190,63 @@ public class Spawner : MonoBehaviour
 
     public void SpawnNewTofu()
     {
-        if (tofuPrefab == null) return;
+        noTofuTimer = 0f; // 生成時は必ずタイマーをリセット
 
-        // GameOver で Spawner が非アクティブになった際に子として残った豆腐を削除
-        // （再有効化時に蘇って余分な豆腐が出るバグを防ぐ）
-        foreach (Transform child in transform)
-            Destroy(child.gameObject);
+        // 浮遊中の豆腐が残っていれば破棄（ゲームリセット時など）
+        // ※ Unity の == は破棄済みオブジェクトを null 扱いするため二重破棄は起きない
+        if (currentTofu != null)
+            Destroy(currentTofu);
+        currentTofu = null; // 破棄済み参照も必ずクリア
 
         droppedTofu = null;
         if (shadowObject != null) shadowObject.SetActive(false);
 
-        currentTofu = Instantiate(tofuPrefab, transform.position, Quaternion.identity);
-        if (!currentTofu.activeSelf) currentTofu.SetActive(true); // テンプレートが非アクティブでも確実に有効化
-        currentTofu.transform.SetParent(transform);
+        // prefab に依存せず毎回直接生成（DDOL テンプレート問題を根本排除）
+        currentTofu = CreateNewTofu();
+        // ★ spawner の子にしない ★
+        // 子にすると SetActive(false) で非アクティブになり
+        // FindGameObjectsWithTag が見つけられなくなるため DestroyActiveTofus が機能しない。
+        // Update() で毎フレーム位置を上書きするので親子関係は不要。
         isMoving = true;
 
-        Collider col = currentTofu.GetComponent<Collider>();
+        var col = currentTofu.GetComponent<Collider>();
         if (col != null) col.enabled = false;
 
         randomOffsetX = Random.Range(0f, 100f);
         randomOffsetZ = Random.Range(0f, 100f);
+    }
+
+    /// <summary>豆腐 GameObject を毎回スクラッチで生成する。DontDestroyOnLoad テンプレート不要。</summary>
+    GameObject CreateNewTofu()
+    {
+        // ── ルート: 物理専用 (BoxCollider は絶対スケール変形しない) ──
+        var go = new GameObject("Tofu");
+        go.tag = "Tofu";
+        go.transform.position   = transform.position;
+        go.transform.localScale = new Vector3(1.5f, 0.8f, 1.5f);
+
+        go.AddComponent<BoxCollider>();
+
+        var rb = go.AddComponent<Rigidbody>();
+        rb.isKinematic            = true;
+        rb.useGravity             = false;
+        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+
+        // ── 子: 見た目専用 (wobble スケールをここに適用、物理に影響しない) ──
+        var visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        visual.name = "Visual";
+        // Visual の BoxCollider を即時無効化してから削除（1 フレームの干渉を防止）
+        var vbc = visual.GetComponent<BoxCollider>();
+        if (vbc != null) { vbc.enabled = false; Destroy(vbc); }
+        var mr = visual.GetComponent<MeshRenderer>();
+        mr.shadowCastingMode = ShadowCastingMode.Off;
+        mr.receiveShadows    = false;
+        visual.transform.SetParent(go.transform, false);
+        visual.transform.localScale = Vector3.one;
+
+        // Tofu コンポーネント最後に追加（Awake 内で Visual を検出するため）
+        go.AddComponent<Tofu>();
+        return go;
     }
 
     private void DropTofu()
@@ -168,16 +254,17 @@ public class Spawner : MonoBehaviour
         if (currentTofu == null) return;
 
         droppedTofu = currentTofu; // 落下中も影を追跡するために保持
+        currentTofu = null;        // 参照をクリア（SpawnNewTofu が誤って破棄しないよう）
         isMoving = false;
-        currentTofu.transform.SetParent(null);
-        currentTofu.name = "DroppedTofu";
+        droppedTofu.name = "DroppedTofu";
+        // ★ SetParent(null) 不要 — spawner の子にしていないため
 
-        Tofu tofu = currentTofu.GetComponent<Tofu>();
+        Tofu tofu = droppedTofu.GetComponent<Tofu>();
         if (tofu != null)
             tofu.Drop();
         else
         {
-            var rb = currentTofu.GetComponent<Rigidbody>();
+            var rb = droppedTofu.GetComponent<Rigidbody>();
             if (rb != null) { rb.isKinematic = false; rb.useGravity = true; }
         }
     }

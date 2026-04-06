@@ -14,6 +14,8 @@ public class GameEffect : MonoBehaviour
     Vector3        camLocalOrigin;
     float          shakeTimer;
     float          shakeMagnitude;
+    float          camTargetY;          // スポーナー上昇に伴うカメラ目標 Y（ローカル座標）
+    bool           camFollowActive;
 
     // ===== Lifecycle =====
 
@@ -28,11 +30,21 @@ public class GameEffect : MonoBehaviour
         mainCam = Camera.main;
         if (mainCam != null)
             camLocalOrigin = mainCam.transform.localPosition;
+        _initialCamLocalY = camLocalOrigin.y;
+        camTargetY = camLocalOrigin.y;
+        camFollowActive = false;
     }
 
     void Update()
     {
         if (mainCam == null) return;
+
+        // スポーナー上昇に伴うカメラ目標 Y をスムーズに追従
+        if (camFollowActive && Mathf.Abs(camLocalOrigin.y - camTargetY) > 0.01f)
+        {
+            camLocalOrigin.y = Mathf.Lerp(camLocalOrigin.y, camTargetY,
+                                           Time.deltaTime * GameConfig.CamFollowSpeed);
+        }
 
         if (shakeTimer > 0f)
         {
@@ -49,6 +61,37 @@ public class GameEffect : MonoBehaviour
     }
 
     // ===== Public API =====
+
+    /// <summary>スポーナーが上昇したときにカメラ目標 Y を更新する</summary>
+    public void SetCameraTargetY(float worldY)
+    {
+        if (mainCam == null) mainCam = Camera.main;
+        // ワールド Y → ローカル Y（親が origin であれば同値）
+        float localY = mainCam != null && mainCam.transform.parent != null
+            ? mainCam.transform.parent.InverseTransformPoint(new Vector3(0f, worldY, 0f)).y
+            : worldY;
+        if (localY > camTargetY)
+        {
+            camTargetY = localY;
+            camFollowActive = true;
+        }
+    }
+
+    /// <summary>ゲームリセット時にカメラ位置を初期状態に戻す</summary>
+    public void ResetCamera()
+    {
+        if (mainCam == null) mainCam = Camera.main;
+        if (mainCam != null)
+            camLocalOrigin = mainCam.transform.localPosition; // 現在位置を再キャプチャ
+        // Start() で記録した initial localPosition に戻す
+        camTargetY      = _initialCamLocalY;
+        camLocalOrigin.y = _initialCamLocalY;
+        camFollowActive = false;
+        if (mainCam != null)
+            mainCam.transform.localPosition = camLocalOrigin;
+    }
+
+    float _initialCamLocalY;
 
     /// <summary>豆腐が着地したときに呼ぶ</summary>
     public void PlayLandEffect(Vector3 worldPos)
