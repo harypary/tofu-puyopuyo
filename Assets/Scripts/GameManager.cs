@@ -52,11 +52,9 @@ public class GameManager : MonoBehaviour
         if (StaminaManager.Instance != null && !StaminaManager.Instance.UseStamina())
         {
             Debug.Log("[Game] スタミナ不足 — ゲーム開始できません");
-            DebugOverlay.AddEvent("StartGame: スタミナ不足");
             return;
         }
 
-        DebugOverlay.AddEvent("StartGame");
         continueCount = 0;
         score = 0;
         UIManager.Instance?.UpdateScore(0);
@@ -65,7 +63,6 @@ public class GameManager : MonoBehaviour
         {
             spawner.gameObject.SetActive(true);
             spawner.SpawnNewTofu(); // OnEnable に依存せず必ず呼ぶ
-            DebugOverlay.AddEvent($"StartGame: SpawnNewTofu done cur={spawner.HasCurrentTofu}");
         }
         SetState(GameState.Playing);
     }
@@ -75,7 +72,6 @@ public class GameManager : MonoBehaviour
         if (gameState != GameState.Playing || spawner == null) return;
         score++;
         UIManager.Instance?.UpdateScore(score);
-        DebugOverlay.AddEvent($"OnTofuPlaced score={score}");
 
         // 積み上げた豆腐の最高点がスポーナーに近づいたら上昇させる
         float stackTop = tofu.transform.position.y + 0.5f; // 豆腐の高さの半分を加算
@@ -88,13 +84,11 @@ public class GameManager : MonoBehaviour
         }
 
         spawner.SpawnNewTofu();
-        DebugOverlay.AddEvent($"OnTofuPlaced: SpawnNewTofu done cur={spawner.HasCurrentTofu}");
     }
 
     public void GameOver()
     {
         if (gameState != GameState.Playing) return;
-        DebugOverlay.AddEvent($"GameOver score={score}");
 
         if (score > bestScore)
         {
@@ -128,11 +122,9 @@ public class GameManager : MonoBehaviour
         if (StaminaManager.Instance != null && !StaminaManager.Instance.UseStamina())
         {
             Debug.Log("[Game] スタミナ不足 — リスタートできません");
-            DebugOverlay.AddEvent("QuickRestart: スタミナ不足");
             return;
         }
 
-        DebugOverlay.AddEvent("QuickRestart");
         if (spawner != null) spawner.gameObject.SetActive(false);
         // アクティブな豆腐のみ削除。FindGameObjectsWithTag はアクティブ限定のため
         // 非アクティブ（DDOL テンプレート / スポーナー無効時の子）は返らず安全。
@@ -169,7 +161,6 @@ public class GameManager : MonoBehaviour
     /// <summary>プレイ中にタイトルへ戻る</summary>
     public void ReturnToTitle()
     {
-        DebugOverlay.AddEvent("ReturnToTitle");
         if (spawner != null) spawner.gameObject.SetActive(false);
         // 豆腐は spawner の子にしていないため SetActive(false) の影響を受けない。
         // FindGameObjectsWithTag でアクティブ豆腐を全削除できる。

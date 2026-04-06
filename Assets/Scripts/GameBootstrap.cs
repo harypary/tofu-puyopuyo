@@ -47,9 +47,6 @@ public class GameBootstrap : MonoBehaviour
         // 広告
         new GameObject("AdManager").AddComponent<AdManager>();
 
-        // デバッグオーバーレイ（原因特定後に削除）
-        new GameObject("DebugOverlay").AddComponent<DebugOverlay>();
-
         // リンク（tofuPrefab は不要。Spawner が直接生成する）
         gm.spawner           = spawner;
         spawner.shadowObject = shadow;
