@@ -213,7 +213,9 @@ public class UIManager : MonoBehaviour
         scaler.uiScaleMode        = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(390, 844);
         scaler.screenMatchMode    = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0f;
+        // 高さ基準でスケール: iPad・大画面でも縦方向が844px分必ず確保される
+        // (幅基準だとiPadで高さが562px相当になりUIが詰まる)
+        scaler.matchWidthOrHeight = 1f;
 
         go.AddComponent<GraphicRaycaster>();
     }
