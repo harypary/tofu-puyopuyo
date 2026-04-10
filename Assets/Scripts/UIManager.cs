@@ -260,12 +260,12 @@ public class UIManager : MonoBehaviour
             new Color(0.55f, 0.42f, 0.25f, 0.75f), TextAnchor.MiddleCenter, true);
         AR(decoT.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(1f, 0.52f));
 
-        var tT = MakeText("Title", titlePanel.transform, "とうふぷよぷよ",
+        var tT = MakeText("Title", titlePanel.transform, "おとうふつみつみ",
             44, ColTextDark, TextAnchor.MiddleCenter, true);
         AR(tT.GetComponent<RectTransform>(), new Vector2(0.05f, 0.626f), new Vector2(0.95f, 0.692f));
         Shadow(tT.gameObject);
 
-        var tS = MakeText("Sub", titlePanel.transform, "おとうふぷよぷよゲーム",
+        var tS = MakeText("Sub", titlePanel.transform, "おとうふつみつみゲーム",
             16, ColTextMid, TextAnchor.MiddleCenter);
         AR(tS.GetComponent<RectTransform>(), new Vector2(0.05f, 0.581f), new Vector2(0.95f, 0.615f));
 
