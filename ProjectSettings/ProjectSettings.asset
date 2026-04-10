@@ -166,9 +166,9 @@ PlayerSettings:
   androidMaxAspectRatio: 2.4
   androidMinAspectRatio: 1
   applicationIdentifier:
-    Android: com.harypary.otofutsumitsumi
-    Standalone: com.harypary.otofutsumitsumi
-    iPhone: com.harypary.otofutsumitsumi
+    Android: com.harypary.tofupuyopuyo
+    Standalone: com.harypary.tofupuyopuyo
+    iPhone: com.harypary.tofupuyopuyo
   buildNumber:
     Standalone: 0
     VisionOS: 0
